@@ -23,6 +23,11 @@
         c=aesjs.utils.hex.fromBytes(obj[0])
         return `/?ciphertext=${c}&client_code=${client_code}&size=${obj[1]}`
     }
+    function decrypt(bytes, client_code, size) {
+        let iv = aesjs.utils.hex.toBytes(sha256(server_code + '*' + client_code)).slice(0, 16)
+        let cipher = new aesjs.ModeOfOperation.cbc(key, iv)
+        return cipher.decrypt(bytes).slice(0, size)
+    }
     function updateDirGlobal(path) {
         let url = '/dir/' + path
         let client_code=Math.floor(Math.random() * 100000000);
@@ -32,16 +37,12 @@
                 return res.text();
             })
             .then(txt => {
+                let temp
                 try {
                     temp = JSON.parse(txt)
-                    if(temp.ac==false){
-                        alert('Password is incorrect.')
-                        let a = document.createElement('a');
-                        a.href = '/';
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
-                    }
+                    temp=decrypt(aesjs.utils.hex.toBytes(temp[0]),client_code,temp[1])
+                    temp=aesjs.utils.utf8.fromBytes(temp)
+                    temp=JSON.parse(temp)
                 } catch (err) {
                     return alert('folder not found.')
                 }

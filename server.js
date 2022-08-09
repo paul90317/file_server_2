@@ -1,37 +1,48 @@
 let argv = process.argv
 let port = 80;
 let folder = 'folder'
-let password="123";
-let random_boot_code=Math.floor(Math.random() * 100000000);
+let password = "123";
+let random_boot_code = Math.floor(Math.random() * 100000000);
 for (let i = 2; i < argv.length - 1; i++) {
   if (argv[i] == '-p') {
     port = parseInt(argv[i + 1])
   } else if (argv[i] == '-f') {
     folder = argv[i + 1]
-  }else if(argv[i]=='-k'){
-    password=argv[i+1]
+  } else if (argv[i] == '-k') {
+    password = argv[i + 1]
   }
 }
 
-const sha256=require('js-sha256').sha256;
+const sha256 = require('js-sha256').sha256;
 const aesjs = require('aes-js');
-let key=aesjs.utils.hex.toBytes(sha256(random_boot_code+'*'+password))
-let used_codes=new Set();
+let key = aesjs.utils.hex.toBytes(sha256(random_boot_code + '*' + password))
+let used_codes = new Set();
 
-function decrypt(bytes,client_code,size){
-  if(used_codes.has(client_code)){
+function encrypt(bytes, client_code) {
+  let iv = aesjs.utils.hex.toBytes(sha256(random_boot_code + '*' + client_code)).slice(0, 16)
+  let cipher = new aesjs.ModeOfOperation.cbc(key, iv)
+  let len = bytes.length
+  let ret = new Uint8Array(bytes.length + 16 - (bytes.length) % 16)
+  for (let i = 0; i < bytes.length; i++) {
+    ret[i] = bytes[i]
+  }
+  return [cipher.encrypt(ret), len]
+}
+
+function decrypt(bytes, client_code, size) {
+  if (used_codes.has(client_code)) {
     return null
   }
   used_codes.add(client_code)
-  let iv=aesjs.utils.hex.toBytes(sha256(random_boot_code+'*'+client_code)).slice(0,16)
-  let cipher=new aesjs.ModeOfOperation.cbc(key,iv)
-  return cipher.decrypt(bytes).slice(0,size)
+  let iv = aesjs.utils.hex.toBytes(sha256(random_boot_code + '*' + client_code)).slice(0, 16)
+  let cipher = new aesjs.ModeOfOperation.cbc(key, iv)
+  return cipher.decrypt(bytes).slice(0, size)
 }
 
 const fs = require('fs')
 if (!fs.existsSync(folder))
   fs.mkdirSync(folder)
-  
+
 const path = require('path')
 const http = require('http');
 
@@ -70,35 +81,35 @@ function joinPath(paths) {
   }
   return ret;
 }
-const jszip=require('jszip');
+const jszip = require('jszip');
 
-function addFilesFromDirectoryToZip (BasePath, zip, ZipPath='') {
-  fs.readdirSync(BasePath).forEach(filename=> {
-      let filePath = `${BasePath}${filename}`;
-      let savePath = `${ZipPath}${filename}`;
-      if (fs.lstatSync(filePath).isFile()) {
-          zip.file(savePath, fs.createReadStream(filePath));
-      }else
-          addFilesFromDirectoryToZip(filePath+'/', zip, savePath+'/');
+function addFilesFromDirectoryToZip(BasePath, zip, ZipPath = '') {
+  fs.readdirSync(BasePath).forEach(filename => {
+    let filePath = `${BasePath}${filename}`;
+    let savePath = `${ZipPath}${filename}`;
+    if (fs.lstatSync(filePath).isFile()) {
+      zip.file(savePath, fs.createReadStream(filePath));
+    } else
+      addFilesFromDirectoryToZip(filePath + '/', zip, savePath + '/');
   });
 }
 http.createServer((req, res) => {
   //handle cipher
-  let url=parseURL(req.url)
-  let client_code=url.params.client_code
-  let size=url.params.size
-  let ciphertext=url.params.ciphertext
-  if(client_code==undefined||size==undefined||ciphertext==undefined)
-    return res.end(fs.readFileSync('index.htm').toString().replace('{server_code}',random_boot_code))
+  let url = parseURL(req.url)
+  let client_code = url.params.client_code
+  let size = url.params.size
+  let ciphertext = url.params.ciphertext
+  if (client_code == undefined || size == undefined || ciphertext == undefined)
+    return res.end(fs.readFileSync('index.htm').toString().replace('{server_code}', random_boot_code))
 
-  try{
-    url=aesjs.utils.utf8.fromBytes(decrypt(aesjs.utils.hex.toBytes(ciphertext),client_code,size))
-  }catch(err){
-    return res.end();
+  try {
+    url = aesjs.utils.utf8.fromBytes(decrypt(aesjs.utils.hex.toBytes(ciphertext), client_code, size))
+  } catch (err) {
+    return res.end()
   }
   url = parseURL(url.toString())
-  if(url.params.ac!='true')
-    return res.end(JSON.stringify({ac:false}))
+  if (url.params.ac != 'true')
+    return res.end()
 
   //handle request
   let paths = parsePath(url.path)
@@ -118,11 +129,15 @@ http.createServer((req, res) => {
                 dirs.push(file);
               else files.push(file);
             });
-            return res.end(JSON.stringify({
+            let data = JSON.stringify({
               dirs: dirs,
               files: files,
-              ac:true
-            }));
+              ac: true
+            });
+            data=aesjs.utils.utf8.toBytes(data)
+            data=encrypt(data,client_code)
+            data[0]=aesjs.utils.hex.fromBytes(data[0])
+            return res.end(JSON.stringify(data));
           }
           break
         case 'file':
@@ -131,9 +146,9 @@ http.createServer((req, res) => {
           }
           break
         case 'zip':
-          if (fs.existsSync(filepath) && fs.lstatSync(filepath).isDirectory()){
-            let zip=new jszip();
-            addFilesFromDirectoryToZip(filepath+'/',zip);
+          if (fs.existsSync(filepath) && fs.lstatSync(filepath).isDirectory()) {
+            let zip = new jszip();
+            addFilesFromDirectoryToZip(filepath + '/', zip);
             return zip.generateNodeStream().pipe(res);
           }
           break
@@ -175,7 +190,7 @@ http.createServer((req, res) => {
         case 'dir':
           if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory())
             return res.end('Folder not found.')
-          if(filepath==folder)
+          if (filepath == folder)
             return res.end('Delete root is not allower')
           fs.rmSync(filepath, { recursive: true });
           return res.end('Folder has been deleted.');
@@ -190,11 +205,11 @@ http.createServer((req, res) => {
           if (temp == null)
             return res.end('.. is not allowed.')
           newpath = joinPath(temp)
-          if(fs.existsSync(newpath))
+          if (fs.existsSync(newpath))
             return res.end('File existed.')
-          try{
+          try {
             fs.renameSync(filepath, newpath)
-          }catch(err){
+          } catch (err) {
             return res.end('Directry not found.');
           }
           return res.end('File has been renamed.');
@@ -205,11 +220,11 @@ http.createServer((req, res) => {
           if (temp == null)
             return res.end('.. is not allowed.')
           newpath = joinPath(temp)
-          if(fs.existsSync(newpath))
+          if (fs.existsSync(newpath))
             return res.end('Folder existed.')
-          try{
+          try {
             fs.renameSync(filepath, newpath)
-          }catch(err){
+          } catch (err) {
             return res.end('Directry not found.');
           }
           return res.end('Folder has been renamed.');
