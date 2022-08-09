@@ -1,0 +1,193 @@
+<script>
+    let paths = [];
+    function updateDirGlobal(path) {
+        let url = '/dir/' + path
+        let pathhtm = document.getElementById('path')
+        pathhtm.innerHTML = ''
+        paths = path.split('/')
+        path = ''
+        pathhtm.innerHTML += `<span onclick="updateDirGlobal('')">/</span>`
+        for (let i in paths) {
+            if (paths[i] == '')
+                continue
+            path += paths[i] + '/'
+            pathhtm.innerHTML += `<span onclick="updateDirGlobal('${path}')">${paths[i]}/</span>`
+        }
+        fetch(url)
+            .then(res => {
+                return res.text();
+            })
+            .then(txt => {
+                try {
+                    temp = JSON.parse(txt)
+                } catch (err) {
+                    return alert('folder not found.')
+                }
+                files = temp.files;
+                dirs = temp.dirs;
+                let content = document.getElementById('content');
+                content.innerHTML = '';
+                for (let i in dirs) {
+                    content.innerHTML += `<div><span onclick="updateDirLocal('${dirs[i]}')">${dirs[i]}/</span>    <span onclick="deleteDir('${dirs[i]}')">delete</span>    <span onclick="renameDir('${dirs[i]}')">rename</span></div>`
+                }
+                for (let i in files) {
+                    content.innerHTML += `<div><span onclick="downloadFile('${files[i]}')">${files[i]}</span>    <span onclick="deleteFile('${files[i]}')">delete</span>    <span onclick="renameFile('${files[i]}')">rename</span></div>`
+                }
+            })
+    }
+    function updateDirLocal(click) {
+        let path = ''
+        for (let i in paths) {
+            if (paths[i] != '')
+                path += paths[i] + '/'
+        }
+        path += click
+        updateDirGlobal(path);
+    }
+    function downloadFile(click) {
+        let path = ''
+        for (let i in paths) {
+            path += paths[i] + '/'
+        }
+        path += click
+        let url = '/file/' + path;
+        fetch(url)
+            .then(res => {
+                return res.blob();
+            })
+            .then(data => {
+                if (data.size == 0)
+                    return alert('empty file.')
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(data);
+                a.download = click;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+    }
+    function downloadZip() {
+        let path = ''
+        for (let i in paths) {
+            path += paths[i] + '/'
+        }
+        let url = '/zip/' + path;
+        fetch(url)
+            .then(res => {
+                return res.blob();
+            })
+            .then(data => {
+                if (data.size == 0)
+                    return alert('empty file.')
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(data);
+                if(paths.length==0)
+                    a.download = 'root.zip';
+                else
+                    a.download=paths[paths.length-1]+'.zip'
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+    }
+    async function sendFile() {
+        let path = '/file/'
+        for (let i in paths) {
+            path += paths[i] + '/'
+        }
+        let files = document.getElementById('file').files;
+        let txt=''
+        for (let i = 0; i < files.length; i++) {
+            let res=await fetch(path + files[i].name, {
+                body: files[i],
+                method: 'POST'
+            })
+            txt+=(await res.text())+'\n';
+        }
+        alert(txt)
+        updateDirLocal('')
+    }
+    function createFolder() {
+        let path = '/'
+        for (let i in paths) {
+            if (paths[i] != '')
+                path += paths[i] + '/'
+        }
+        path = prompt('Folder path: ', path);
+        fetch('/dir' + path, {
+            method: 'POST'
+        }).then(res => res.text())
+            .then(txt =>{
+                alert(txt)
+                updateDirLocal('')
+            })
+    }
+    function deleteFile(click) {
+        let path = '/file/'
+        for (let i in paths) {
+            path += paths[i] + '/'
+        }
+        path += click
+        fetch(path, {
+            method: 'DELETE'
+        }).then(res => res.text())
+            .then(txt =>{
+                alert(txt)
+                updateDirLocal('')
+            })
+    }
+    function deleteDir(click) {
+        let path = '/dir/'
+        for (let i in paths) {
+            path += paths[i] + '/'
+        }
+        path += click
+        fetch(path, {
+            method: 'DELETE'
+        }).then(res => res.text())
+            .then(txt =>{
+                alert(txt)
+                updateDirLocal('')
+            })
+    }
+    function renameDir(click) {
+        let path = '/'
+        for (let i in paths) {
+            if (paths[i] != '')
+                path += paths[i] + '/'
+        }
+        path += click
+        newpath = prompt('New folder name: ', path)
+        fetch('/dir' + path + '?newpath=' + newpath, {
+            method: 'PATCH'
+        }).then(res => res.text())
+            .then(txt =>{
+                alert(txt)
+                updateDirLocal('')
+            })
+    }
+    function renameFile(click) {
+        let path = '/'
+        for (let i in paths) {
+            if (paths[i] != '')
+                path += paths[i] + '/'
+        }
+        path += click
+        newpath = prompt('New file name: ', path)
+        fetch('/file' + path + '?newpath=' + newpath, {
+            method: 'PATCH'
+        }).then(res => res.text())
+            .then(txt =>{
+                alert(txt)
+                updateDirLocal('')
+            })
+    }
+</script>
+
+<body onload="updateDirGlobal('')">
+    <div id="path"></div>
+    <input type="file" multiple="true" onchange="sendFile()" id="file">
+    <button onclick="createFolder()">Create new folder</button>
+    <button onclick="downloadZip()">Download Folder (zip)</button>
+    <div id="content"></div>
+</body>

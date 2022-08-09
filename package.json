@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "create-react-app": "^5.0.1",
+    "jszip": "^3.10.1"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "name": "file_server",
+  "version": "1.0.0",
+  "main": "server.js",
+  "devDependencies": {},
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
