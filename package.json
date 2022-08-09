@@ -1,6 +1,8 @@
 {
   "dependencies": {
+    "aes-js": "^3.1.2",
     "create-react-app": "^5.0.1",
+    "js-sha256": "^0.9.0",
     "jszip": "^3.10.1"
   },
   "scripts": {
@@ -9,7 +11,6 @@
   "name": "file_server",
   "version": "1.0.0",
   "main": "server.js",
-  "devDependencies": {},
   "author": "",
   "license": "ISC",
   "description": ""

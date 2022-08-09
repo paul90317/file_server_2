@@ -1,13 +1,33 @@
 let argv = process.argv
 let port = 80;
 let folder = 'folder'
+let password="123";
+let random_boot_code=Math.floor(Math.random() * 100000000);
 for (let i = 2; i < argv.length - 1; i++) {
   if (argv[i] == '-p') {
     port = parseInt(argv[i + 1])
   } else if (argv[i] == '-f') {
     folder = argv[i + 1]
+  }else if(argv[i]=='-k'){
+    password=argv[i+1]
   }
 }
+
+const sha256=require('js-sha256').sha256;
+const aesjs = require('aes-js');
+let key=aesjs.utils.hex.toBytes(sha256(random_boot_code+'*'+password))
+let used_codes=new Set();
+
+function decrypt(bytes,client_code,size){
+  if(used_codes.has(client_code)){
+    return null
+  }
+  used_codes.add(client_code)
+  let iv=aesjs.utils.hex.toBytes(sha256(random_boot_code+'*'+client_code)).slice(0,16)
+  let cipher=new aesjs.ModeOfOperation.cbc(key,iv)
+  return cipher.decrypt(bytes).slice(0,size)
+}
+
 const fs = require('fs')
 if (!fs.existsSync(folder))
   fs.mkdirSync(folder)
@@ -16,7 +36,7 @@ const path = require('path')
 const http = require('http');
 
 function parseURL(url) {
-  url = decodeURI(url).split('?')
+  url = url.split('?')
   let upath = url[0]
   let ret = { path: upath, params: {} }
   if (url.length == 1)
@@ -50,7 +70,8 @@ function joinPath(paths) {
   }
   return ret;
 }
-const jszip=require('jszip')
+const jszip=require('jszip');
+
 function addFilesFromDirectoryToZip (BasePath, zip, ZipPath='') {
   fs.readdirSync(BasePath).forEach(filename=> {
       let filePath = `${BasePath}${filename}`;
@@ -61,9 +82,25 @@ function addFilesFromDirectoryToZip (BasePath, zip, ZipPath='') {
           addFilesFromDirectoryToZip(filePath+'/', zip, savePath+'/');
   });
 }
-
 http.createServer((req, res) => {
-  let url = parseURL(req.url)
+  //handle cipher
+  let url=parseURL(req.url)
+  let client_code=url.params.client_code
+  let size=url.params.size
+  let ciphertext=url.params.ciphertext
+  if(client_code==undefined||size==undefined||ciphertext==undefined)
+    return res.end(fs.readFileSync('index.htm').toString().replace('{server_code}',random_boot_code))
+
+  try{
+    url=aesjs.utils.utf8.fromBytes(decrypt(aesjs.utils.hex.toBytes(ciphertext),client_code,size))
+  }catch(err){
+    return res.end();
+  }
+  url = parseURL(url.toString())
+  if(url.params.ac!='true')
+    return res.end(JSON.stringify({ac:false}))
+
+  //handle request
   let paths = parsePath(url.path)
   if (paths == null)
     return res.end()
@@ -82,8 +119,9 @@ http.createServer((req, res) => {
               else files.push(file);
             });
             return res.end(JSON.stringify({
-              "dirs": dirs,
-              "files": files
+              dirs: dirs,
+              files: files,
+              ac:true
             }));
           }
           break
@@ -99,8 +137,6 @@ http.createServer((req, res) => {
             return zip.generateNodeStream().pipe(res);
           }
           break
-        default:
-          return res.end(fs.readFileSync('index.htm'));
       }
       break;
     case 'POST':
