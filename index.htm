@@ -7,62 +7,20 @@
 <script src="/chipher.js"></script>
 <script>
     let paths = [];
-    let server_code = '{server_code}'
-    let key = aesjs.utils.hex.toBytes(sha256(server_code + '*' + prompt('password: ', '')))
-    function encrypt(bytes, client_code) {
-        let iv = aesjs.utils.hex.toBytes(sha256(server_code + '*' + client_code)).slice(0, 16)
-        let cipher = new aesjs.ModeOfOperation.cbc(key, iv)
-        let temp
-        if (bytes.byteLength % 16 == 0) {
-            temp = new Uint8Array(bytes.byteLength)
-        } else {
-            temp = new Uint8Array(bytes.byteLength + 16 - (bytes.byteLength % 16))
-        }
-        for (let i = 0; i < bytes.byteLength; i++) {
-            temp[i] = bytes[i]
-        }
-        for (let i = bytes.byteLength; i < temp.byteLength; i++) {
-            temp[i] = random() % 256;
-        }
+    let Snonce = '{server_code}'
+    let key = aesjs.utils.hex.toBytes(sha256(Snonce + '*' + prompt('password: ', '')))
 
-        temp = cipher.encrypt(temp)
-        let len = bytes.byteLength
-        bytes = new Uint8Array(temp.byteLength + 4)
-        for (let i = 0; i < 4; i++) {
-            bytes[3 - i] = len
-            len >>= 8
-        }
-        for (let i = 0; i < temp.byteLength; i++) {
-            bytes[i + 4] = temp[i]
-        }
-        return bytes
-    }
-    function decrypt(bytes, client_code) {
-        let iv = aesjs.utils.hex.toBytes(sha256(server_code + '*' + client_code)).slice(0, 16)
-        let cipher = new aesjs.ModeOfOperation.cbc(key, iv)
-        let len = 0
-        for (let i = 0; i < 4; i++) {
-            len <<= 8;
-            len += bytes[i];
-        }
-        let data = bytes.slice(4)
-        data = cipher.decrypt(data)
-        return data.slice(0, len)
-    }
-
-    function pack_url(url, client_code) {
-        if (url.split('?').length > 1)
-            url += '&ac=true'
-        else
-            url += '?ac=true'
-        let c = encrypt(aesjs.utils.utf8.toBytes(url), client_code)
+    function pack_url(cipher, url,Cnonce) {
+        let c = cipher.encrypt(aesjs.utils.utf8.toBytes(url))
         c = aesjs.utils.hex.fromBytes(c)
-        return `/?ciphertext=${c}&client_code=${client_code}`
+        return `/?c=${c}&nonce=${Cnonce}`
     }
     function updateDirGlobal(path) {
         let url = '/dir/' + path
-        let client_code = random();
-        url = pack_url(url, client_code);
+        let Cnonce = random();
+        let iv=ivGen(Cnonce,Snonce)
+        let cipher=new Cipher(key,iv)
+        url = pack_url(cipher,url,Cnonce);
         fetch(url)
             .then(res => {
                 return res.text();
@@ -72,7 +30,7 @@
                     return alert('folder not found.')
                 try {
                     data = aesjs.utils.hex.toBytes(data)
-                    data = decrypt(data, client_code)
+                    data = cipher.decrypt(data)
                     data = aesjs.utils.utf8.fromBytes(data)
                     data = JSON.parse(data)
                 } catch (err) {
@@ -119,8 +77,10 @@
         }
         path += click
         let url = '/file/' + path;
-        let client_code = random();
-        url = pack_url(url, client_code);
+        let Cnonce = random();
+        let iv=ivGen(Cnonce,Snonce)
+        let cipher=new Cipher(key,iv)
+        url = pack_url(cipher,url,Cnonce);
         fetch(url)
             .then(res => {
                 return res.blob();
@@ -132,7 +92,7 @@
                 if (data.byteLength == 0)
                     return alert('empty file.')
                 data = new Uint8Array(data)
-                data = decrypt(data, client_code)
+                data = cipher.decrypt(data)
                 let a = document.createElement('a');
                 blob = new Blob([data])
                 a.href = URL.createObjectURL(blob);
@@ -148,8 +108,10 @@
             path += paths[i] + '/'
         }
         let url = '/zip/' + path;
-        let client_code = random();
-        url = pack_url(url, client_code);
+        let Cnonce = random();
+        let iv=ivGen(Cnonce,Snonce)
+        let cipher=new Cipher(key,iv)
+        url = pack_url(cipher,url,Cnonce);
         fetch(url)
             .then(res => {
                 return res.blob();
@@ -161,7 +123,7 @@
                 if (data.byteLength == 0)
                     return alert('empty file.')
                 data = new Uint8Array(data);
-                data = decrypt(data, client_code)
+                data = cipher.decrypt(data)
                 let a = document.createElement('a');
                 a.href = URL.createObjectURL(new Blob([data]));
                 if (paths.length == 0)
@@ -184,9 +146,12 @@
             let client_code = random();
             let body = await files[i].arrayBuffer()
             body = new Uint8Array(body)
-            digest = sha256(body)
-            let url = pack_url(path + files[i].name + '?digest=' + digest, client_code)
-            body = encrypt(body, client_code)
+            let url=path + files[i].name
+            let Cnonce = random();
+            let iv=ivGen(Cnonce,Snonce)
+            let cipher=new Cipher(key,iv)
+            url = pack_url(cipher,url,Cnonce);
+            body = cipher.encrypt(body)
             let res = await fetch(url, {
                 body: body,
                 method: 'POST'
@@ -202,9 +167,12 @@
             if (paths[i] != '')
                 path += paths[i] + '/'
         }
-        path = prompt('Folder path: ', path);
-        let client_code = random();
-        let url = pack_url('/dir' + path, client_code);
+        path = prompt('Folder path: ', path);;
+        let url = '/dir' + path;
+        let Cnonce = random();
+        let iv=ivGen(Cnonce,Snonce)
+        let cipher=new Cipher(key,iv)
+        url = pack_url(cipher,url,Cnonce);
         fetch(url, {
             method: 'POST'
         }).then(res => res.text())
@@ -219,8 +187,11 @@
             path += paths[i] + '/'
         }
         path += click
-        let client_code = random();
-        let url = pack_url(path, client_code);
+        let url = path
+        let Cnonce = random();
+        let iv=ivGen(Cnonce,Snonce)
+        let cipher=new Cipher(key,iv)
+        url = pack_url(cipher,url,Cnonce);
         fetch(url, {
             method: 'DELETE'
         }).then(res => res.text())
@@ -235,8 +206,11 @@
             path += paths[i] + '/'
         }
         path += click
-        let client_code = random();
-        let url = pack_url(path, client_code);
+        let url = path
+        let Cnonce = random();
+        let iv=ivGen(Cnonce,Snonce)
+        let cipher=new Cipher(key,iv)
+        url = pack_url(cipher,url,Cnonce);
         fetch(url, {
             method: 'DELETE'
         }).then(res => res.text())
@@ -253,8 +227,11 @@
         }
         path += click
         newpath = prompt('New folder name: ', path)
-        let client_code = random();
-        let url = pack_url('/dir' + path + '?newpath=' + newpath, client_code);
+        let url = '/dir' + path + '?newpath=' + newpath
+        let Cnonce = random();
+        let iv=ivGen(Cnonce,Snonce)
+        let cipher=new Cipher(key,iv)
+        url = pack_url(cipher,url,Cnonce);
         fetch(url, {
             method: 'PATCH'
         }).then(res => res.text())
@@ -271,8 +248,11 @@
         }
         path += click
         newpath = prompt('New file name: ', path)
-        let client_code = random();
-        let url = pack_url('/file' + path + '?newpath=' + newpath, client_code);
+        let url = '/file' + path + '?newpath=' + newpath
+        let Cnonce = random();
+        let iv=ivGen(Cnonce,Snonce)
+        let cipher=new Cipher(key,iv)
+        url = pack_url(cipher,url,Cnonce);
         fetch(url, {
             method: 'PATCH'
         }).then(res => res.text())

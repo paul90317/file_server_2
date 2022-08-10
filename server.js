@@ -2,7 +2,6 @@ let argv = process.argv
 let port = 80;
 let folder = 'folder'
 let password = "123";
-let server_code = random()
 for (let i = 2; i < argv.length - 1; i++) {
   if (argv[i] == '-p') {
     port = parseInt(argv[i + 1])
@@ -15,52 +14,11 @@ for (let i = 2; i < argv.length - 1; i++) {
 
 const sha256 = require('js-sha256').sha256;
 const aesjs = require('aes-js');
-let key = aesjs.utils.hex.toBytes(sha256(server_code + '*' + password))
-let used_codes = new Set();
+const mc=require('./cipher')
+const Snonce=mc.random()
+const key=aesjs.utils.hex.toBytes(sha256(Snonce+'*'+password))
+let used_nonces = new Set();
 
-function random() {
-  return Math.floor(Math.random() * 100000000);
-}
-function encrypt(bytes, client_code) {
-  let iv = aesjs.utils.hex.toBytes(sha256(server_code + '*' + client_code)).slice(0, 16)
-  let cipher = new aesjs.ModeOfOperation.cbc(key, iv)
-  let temp
-  if (bytes.byteLength % 16 == 0) {
-    temp = new Uint8Array(bytes.byteLength)
-  } else {
-    temp = new Uint8Array(bytes.byteLength + 16 - (bytes.byteLength % 16))
-  }
-  for (let i = 0; i < bytes.byteLength; i++) {
-    temp[i] = bytes[i]
-  }
-  for (let i = bytes.byteLength; i < temp.byteLength; i++) {
-    temp[i] = random() % 256;
-  }
-
-  temp = cipher.encrypt(temp)
-  let len = bytes.byteLength
-  bytes = new Uint8Array(temp.byteLength + 4)
-  for (let i = 0; i < 4; i++) {
-    bytes[3 - i] = len
-    len >>= 8
-  }
-  for (let i = 0; i < temp.byteLength; i++) {
-    bytes[i + 4] = temp[i]
-  }
-  return bytes
-}
-function decrypt(bytes, client_code) {
-  let iv = aesjs.utils.hex.toBytes(sha256(server_code + '*' + client_code)).slice(0, 16)
-  let cipher = new aesjs.ModeOfOperation.cbc(key, iv)
-  let len = 0
-  for (let i = 0; i < 4; i++) {
-    len <<= 8;
-    len += bytes[i];
-  }
-  let data = bytes.slice(4)
-  data = cipher.decrypt(data)
-  return data.slice(0, len)
-}
 
 const fs = require('fs')
 if (!fs.existsSync(folder))
@@ -119,29 +77,33 @@ function addFilesFromDirectoryToZip(BasePath, zip, ZipPath = '') {
 http.createServer(async (req, res) => {
   //handle cipher
   let url = parseURL(req.url)
-  let client_code = url.params.client_code
-  let ciphertext = url.params.ciphertext
-  if (client_code == undefined || ciphertext == undefined)
+  let Cnonce = url.params.nonce
+  let ciphertext = url.params.c
+  if (Cnonce == undefined || ciphertext == undefined)
     if (req.method == 'GET') {
       if (req.url=='/')
-        return res.end(fs.readFileSync('index.htm').toString().replace('{server_code}', server_code))
+        return res.end(fs.readFileSync('index.htm').toString().replace('{server_code}', Snonce))
       if (req.url=='/chipher.js')
-        return res.end(fs.readFileSync('chipher.js'))
+        return res.end(fs.readFileSync('cipher.js'))
       return res.end()
     }
 
 
-  if (used_codes.has(client_code))
+  if (used_nonces.has(Cnonce))
     return res.end()
+  let iv=mc.ivGen(Cnonce,Snonce)
+  let cipher=new mc.Cipher(key,iv)
   try {
-    url = aesjs.utils.utf8.fromBytes(decrypt(aesjs.utils.hex.toBytes(ciphertext), client_code))
+    let temp=cipher.decrypt(aesjs.utils.hex.toBytes(ciphertext))
+    if(temp==null){
+      return res.end()
+    }
+    url = aesjs.utils.utf8.fromBytes(temp)
   } catch (err) {
     return res.end()
   }
   url = parseURL(url.toString())
-  if (url.params.ac != 'true')
-    return res.end()
-  used_codes.add(client_code)
+  used_nonces.add(Cnonce)
 
   //handle request
   let paths = parsePath(url.path)
@@ -167,7 +129,7 @@ http.createServer(async (req, res) => {
               ac: true
             });
             data = aesjs.utils.utf8.toBytes(data)
-            data = encrypt(data, client_code)
+            data = cipher.encrypt(data)
             data = aesjs.utils.hex.fromBytes(data)
             return res.end(data);
           }
@@ -176,7 +138,7 @@ http.createServer(async (req, res) => {
           if (fs.existsSync(filepath) && fs.lstatSync(filepath).isFile()) {
             let data = fs.readFileSync(filepath);
             data = new Uint8Array(data)
-            data = encrypt(data, client_code)
+            data = cipher.encrypt(data)
             return res.end(data);
           }
           break
@@ -190,7 +152,7 @@ http.createServer(async (req, res) => {
               body.push(chunk)
             }).on('end', () => {
               body = new Uint8Array(Buffer.concat(body))
-              body = encrypt(body, client_code)
+              body = cipher.encrypt(body)
               return res.end(body);
             })
           }
@@ -209,18 +171,12 @@ http.createServer(async (req, res) => {
             try {
               body = Buffer.concat(body)
               body = new Uint8Array(body)
-              try {
-                body = decrypt(body, client_code)
-              } catch (err) {
-                console.log(err)
-              }
-              let digest = sha256(body)
-              if (url.params.digest != digest) {
-                return res.end('The pack is unvalid.')
-              }
+              body = cipher.decrypt(body)
+              if(body==null)
+                return res.end('Decrypt error.');
               fs.writeFileSync(filepath, body, { flag: 'w+' });
             } catch (err) {
-              return res.end('Directry not found.');
+              return res.end('Upload failed.');
             }
             return res.end('File has been uploaded.');
           });
