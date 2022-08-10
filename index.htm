@@ -1,48 +1,80 @@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.9.0/sha256.min.js" integrity="sha512-szJ5FSo9hEmXXe7b5AUVtn/WnL8a5VofnFeYC2i2z03uS2LhAch7ewNLbl5flsEmTTimMN0enBZg/3sQ+YOSzQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/aes-js/3.1.2/index.min.js" integrity="sha512-LOqfKFwH2W3jeb0NzXcImFlSyoL7hjsWbZvIeKNOaZw1gFw+yKTE/QUDGLit2KWdd57qd6IgMDkppK2tkwIEhA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.9.0/sha256.min.js"
+    integrity="sha512-szJ5FSo9hEmXXe7b5AUVtn/WnL8a5VofnFeYC2i2z03uS2LhAch7ewNLbl5flsEmTTimMN0enBZg/3sQ+YOSzQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aes-js/3.1.2/index.min.js"
+    integrity="sha512-LOqfKFwH2W3jeb0NzXcImFlSyoL7hjsWbZvIeKNOaZw1gFw+yKTE/QUDGLit2KWdd57qd6IgMDkppK2tkwIEhA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="/chipher.js"></script>
 <script>
     let paths = [];
-    let server_code={server_code}
-    let key=aesjs.utils.hex.toBytes(sha256(server_code+'*'+prompt('password: ','')))
-    function encrypt(bytes,client_code){
-        let iv=aesjs.utils.hex.toBytes(sha256(server_code+'*'+client_code)).slice(0,16)
-        let cipher=new aesjs.ModeOfOperation.cbc(key,iv)
-        let len=bytes.length
-        let ret=new Uint8Array(bytes.length+16-(bytes.length)%16)
-        for(let i=0;i<bytes.length;i++){
-            ret[i]=bytes[i]
-        }
-        return [cipher.encrypt(ret),len]
-    }
-    function pack_url(url,client_code){
-        if(url.split('?').length>1)
-            url+='&ac=true'
-        else
-            url+='?ac=true'
-        let obj=encrypt(aesjs.utils.utf8.toBytes(url),client_code)
-        c=aesjs.utils.hex.fromBytes(obj[0])
-        return `/?ciphertext=${c}&client_code=${client_code}&size=${obj[1]}`
-    }
-    function decrypt(bytes, client_code, size) {
+    let server_code = '{server_code}'
+    let key = aesjs.utils.hex.toBytes(sha256(server_code + '*' + prompt('password: ', '')))
+    function encrypt(bytes, client_code) {
         let iv = aesjs.utils.hex.toBytes(sha256(server_code + '*' + client_code)).slice(0, 16)
         let cipher = new aesjs.ModeOfOperation.cbc(key, iv)
-        return cipher.decrypt(bytes).slice(0, size)
+        let temp
+        if (bytes.byteLength % 16 == 0) {
+            temp = new Uint8Array(bytes.byteLength)
+        } else {
+            temp = new Uint8Array(bytes.byteLength + 16 - (bytes.byteLength % 16))
+        }
+        for (let i = 0; i < bytes.byteLength; i++) {
+            temp[i] = bytes[i]
+        }
+        for (let i = bytes.byteLength; i < temp.byteLength; i++) {
+            temp[i] = random() % 256;
+        }
+
+        temp = cipher.encrypt(temp)
+        let len = bytes.byteLength
+        bytes = new Uint8Array(temp.byteLength + 4)
+        for (let i = 0; i < 4; i++) {
+            bytes[3 - i] = len
+            len >>= 8
+        }
+        for (let i = 0; i < temp.byteLength; i++) {
+            bytes[i + 4] = temp[i]
+        }
+        return bytes
+    }
+    function decrypt(bytes, client_code) {
+        let iv = aesjs.utils.hex.toBytes(sha256(server_code + '*' + client_code)).slice(0, 16)
+        let cipher = new aesjs.ModeOfOperation.cbc(key, iv)
+        let len = 0
+        for (let i = 0; i < 4; i++) {
+            len <<= 8;
+            len += bytes[i];
+        }
+        let data = bytes.slice(4)
+        data = cipher.decrypt(data)
+        return data.slice(0, len)
+    }
+
+    function pack_url(url, client_code) {
+        if (url.split('?').length > 1)
+            url += '&ac=true'
+        else
+            url += '?ac=true'
+        let c = encrypt(aesjs.utils.utf8.toBytes(url), client_code)
+        c = aesjs.utils.hex.fromBytes(c)
+        return `/?ciphertext=${c}&client_code=${client_code}`
     }
     function updateDirGlobal(path) {
         let url = '/dir/' + path
-        let client_code=Math.floor(Math.random() * 100000000);
-        url=pack_url(url,client_code);
+        let client_code = random();
+        url = pack_url(url, client_code);
         fetch(url)
             .then(res => {
                 return res.text();
             })
-            .then(txt => {
-                let temp
+            .then(data => {
+                if (data.length == 0)
+                    return alert('folder not found.')
                 try {
-                    temp = JSON.parse(txt)
-                    temp=decrypt(aesjs.utils.hex.toBytes(temp[0]),client_code,temp[1])
-                    temp=aesjs.utils.utf8.fromBytes(temp)
-                    temp=JSON.parse(temp)
+                    data = aesjs.utils.hex.toBytes(data)
+                    data = decrypt(data, client_code)
+                    data = aesjs.utils.utf8.fromBytes(data)
+                    data = JSON.parse(data)
                 } catch (err) {
                     return alert('folder not found.')
                 }
@@ -59,8 +91,8 @@
                     pathhtm.innerHTML += `<span onclick="updateDirGlobal('${path}')">${paths[i]}/</span>`
                 }
                 //content
-                files = temp.files;
-                dirs = temp.dirs;
+                files = data.files;
+                dirs = data.dirs;
                 let content = document.getElementById('content');
                 content.innerHTML = '';
                 for (let i in dirs) {
@@ -87,17 +119,23 @@
         }
         path += click
         let url = '/file/' + path;
-        let client_code=Math.floor(Math.random() * 100000000);
-        url=pack_url(url,client_code);
+        let client_code = random();
+        url = pack_url(url, client_code);
         fetch(url)
             .then(res => {
                 return res.blob();
             })
+            .then(blob => {
+                return blob.arrayBuffer();
+            })
             .then(data => {
-                if (data.size == 0)
+                if (data.byteLength == 0)
                     return alert('empty file.')
+                data = new Uint8Array(data)
+                data = decrypt(data, client_code)
                 let a = document.createElement('a');
-                a.href = URL.createObjectURL(data);
+                blob = new Blob([data])
+                a.href = URL.createObjectURL(blob);
                 a.download = click;
                 document.body.appendChild(a);
                 a.click();
@@ -110,21 +148,26 @@
             path += paths[i] + '/'
         }
         let url = '/zip/' + path;
-        let client_code=Math.floor(Math.random() * 100000000);
-        url=pack_url(url,client_code);
+        let client_code = random();
+        url = pack_url(url, client_code);
         fetch(url)
             .then(res => {
                 return res.blob();
             })
+            .then(blob => {
+                return blob.arrayBuffer();
+            })
             .then(data => {
-                if (data.size == 0)
+                if (data.byteLength == 0)
                     return alert('empty file.')
-                var a = document.createElement('a');
-                a.href = URL.createObjectURL(data);
-                if(paths.length==0)
+                data = new Uint8Array(data);
+                data = decrypt(data, client_code)
+                let a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([data]));
+                if (paths.length == 0)
                     a.download = 'root.zip';
                 else
-                    a.download=paths[paths.length-1]+'.zip'
+                    a.download = paths[paths.length - 1] + '.zip'
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -136,15 +179,19 @@
             path += paths[i] + '/'
         }
         let files = document.getElementById('file').files;
-        let txt=''
+        let txt = ''
         for (let i = 0; i < files.length; i++) {
-            let client_code=Math.floor(Math.random() * 100000000);
-            let url=pack_url(path + files[i].name,client_code);
-            let res=await fetch(url, {
-                body: files[i],
+            let client_code = random();
+            let body = await files[i].arrayBuffer()
+            body = new Uint8Array(body)
+            digest = sha256(body)
+            let url = pack_url(path + files[i].name + '?digest=' + digest, client_code)
+            body = encrypt(body, client_code)
+            let res = await fetch(url, {
+                body: body,
                 method: 'POST'
             })
-            txt+=(await res.text())+'\n';
+            txt += (await res.text()) + '\n';
         }
         alert(txt)
         updateDirLocal('')
@@ -156,12 +203,12 @@
                 path += paths[i] + '/'
         }
         path = prompt('Folder path: ', path);
-        let client_code=Math.floor(Math.random() * 100000000);
-        let url=pack_url('/dir' + path,client_code);
+        let client_code = random();
+        let url = pack_url('/dir' + path, client_code);
         fetch(url, {
             method: 'POST'
         }).then(res => res.text())
-            .then(txt =>{
+            .then(txt => {
                 alert(txt)
                 updateDirLocal('')
             })
@@ -172,12 +219,12 @@
             path += paths[i] + '/'
         }
         path += click
-        let client_code=Math.floor(Math.random() * 100000000);
-        let url=pack_url(path,client_code);
+        let client_code = random();
+        let url = pack_url(path, client_code);
         fetch(url, {
             method: 'DELETE'
         }).then(res => res.text())
-            .then(txt =>{
+            .then(txt => {
                 alert(txt)
                 updateDirLocal('')
             })
@@ -188,12 +235,12 @@
             path += paths[i] + '/'
         }
         path += click
-        let client_code=Math.floor(Math.random() * 100000000);
-        let url=pack_url(path,client_code);
+        let client_code = random();
+        let url = pack_url(path, client_code);
         fetch(url, {
             method: 'DELETE'
         }).then(res => res.text())
-            .then(txt =>{
+            .then(txt => {
                 alert(txt)
                 updateDirLocal('')
             })
@@ -206,12 +253,12 @@
         }
         path += click
         newpath = prompt('New folder name: ', path)
-        let client_code=Math.floor(Math.random() * 100000000);
-        let url=pack_url('/dir' + path + '?newpath=' + newpath,client_code);
+        let client_code = random();
+        let url = pack_url('/dir' + path + '?newpath=' + newpath, client_code);
         fetch(url, {
             method: 'PATCH'
         }).then(res => res.text())
-            .then(txt =>{
+            .then(txt => {
                 alert(txt)
                 updateDirLocal('')
             })
@@ -224,12 +271,12 @@
         }
         path += click
         newpath = prompt('New file name: ', path)
-        let client_code=Math.floor(Math.random() * 100000000);
-        let url=pack_url('/file' + path + '?newpath=' + newpath,client_code);
+        let client_code = random();
+        let url = pack_url('/file' + path + '?newpath=' + newpath, client_code);
         fetch(url, {
             method: 'PATCH'
         }).then(res => res.text())
-            .then(txt =>{
+            .then(txt => {
                 alert(txt)
                 updateDirLocal('')
             })
