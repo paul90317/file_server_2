@@ -82,9 +82,9 @@ http.createServer((req, res) => {
   if (Cnonce == undefined || ciphertext == undefined)
     if (req.method == 'GET') {
       if (req.url=='/')
-        return res.end(fs.readFileSync('index.htm').toString().replace('{server_code}', Snonce))
+        return res.end(fs.readFileSync(__dirname+'/index.htm').toString().replace('{server_code}', Snonce))
       if (req.url=='/chipher.js')
-        return res.end(fs.readFileSync('cipher.js'))
+        return res.end(fs.readFileSync(__dirname+'/cipher.js'))
       return res.end()
     }
 
@@ -176,71 +176,71 @@ http.createServer((req, res) => {
                 return res.end('Decrypt error.');
               fs.writeFileSync(filepath, body, { flag: 'w+' });
             } catch (err) {
-              return res.end('Upload failed.');
+              return res.end('0');
             }
-            return res.end('File has been uploaded.');
+            return res.end('1');
           });
         case 'dir':
           if (fs.existsSync(filepath))
-            return res.end('Folder was existed.');
+            return res.end('0');
           try {
             fs.mkdirSync(filepath);
           } catch (err) {
-            return res.end('Directry not found.');
+            return res.end('0');
           }
-          return res.end('Folder has been created.');
+          return res.end('1');
       }
     case 'DELETE':
       switch (cmd) {
         case 'file':
           if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isFile())
-            return res.end('File not found.')
+            return res.end('0')
           fs.unlinkSync(filepath)
-          return res.end('File has been deleted.');
+          return res.end('1');
         case 'dir':
           if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory())
-            return res.end('Folder not found.')
+            return res.end('0')
           if (filepath == folder)
-            return res.end('Delete root is not allower')
+            return res.end('0')
           fs.rmSync(filepath, { recursive: true });
-          return res.end('Folder has been deleted.');
+          return res.end('1');
       }
     case 'PATCH':
       let newpath, temp;
       switch (cmd) {
         case 'file':
           if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isFile())
-            return res.end('File not found.')
+            return res.end('0')
           temp = parsePath(url.params.newpath)
           if (temp == null)
-            return res.end('.. is not allowed.')
+            return res.end('0')
           newpath = joinPath(temp)
           if (fs.existsSync(newpath))
-            return res.end('File existed.')
+            return res.end('0')
           try {
             fs.renameSync(filepath, newpath)
           } catch (err) {
-            return res.end('Directry not found.');
+            return res.end('0');
           }
-          return res.end('File has been renamed.');
+          return res.end('1');
         case 'dir':
           if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory())
-            return res.end('Folder not found.')
+            return res.end('0')
           temp = parsePath(url.params.newpath)
           if (temp == null)
-            return res.end('.. is not allowed.')
+            return res.end('0')
           newpath = joinPath(temp)
           if (fs.existsSync(newpath))
-            return res.end('Folder existed.')
+            return res.end('0')
           try {
             fs.renameSync(filepath, newpath)
           } catch (err) {
-            return res.end('Directry not found.');
+            return res.end('0');
           }
-          return res.end('Folder has been renamed.');
+          return res.end('1');
       }
   }
-  res.end();
+  res.end('0');
 }).listen(port, () => {
   console.log(`http://127.0.0.1:${port}`)
 });

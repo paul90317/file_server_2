@@ -34,6 +34,7 @@
                     data = aesjs.utils.utf8.fromBytes(data)
                     data = JSON.parse(data)
                 } catch (err) {
+                    console.log(err)
                     return alert('folder not found.')
                 }
                 //path
