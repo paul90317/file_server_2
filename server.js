@@ -74,7 +74,7 @@ function addFilesFromDirectoryToZip(BasePath, zip, ZipPath = '') {
       addFilesFromDirectoryToZip(filePath + '/', zip, savePath + '/');
   });
 }
-http.createServer(async (req, res) => {
+http.createServer((req, res) => {
   //handle cipher
   let url = parseURL(req.url)
   let Cnonce = url.params.nonce
