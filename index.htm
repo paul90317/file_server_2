@@ -23,14 +23,13 @@
         url = pack_url(cipher,url,Cnonce);
         fetch(url)
             .then(res => {
-                return res.text();
+                return res.arrayBuffer();
             })
             .then(data => {
-                if (data.length == 0)
+                if (data.byteLength == 0)
                     return alert('folder not found.')
                 try {
-                    data = aesjs.utils.hex.toBytes(data)
-                    data = cipher.decrypt(data)
+                    data = cipher.decrypt(new Uint8Array(data))
                     data = aesjs.utils.utf8.fromBytes(data)
                     data = JSON.parse(data)
                 } catch (err) {
@@ -127,10 +126,8 @@
                 data = cipher.decrypt(data)
                 let a = document.createElement('a');
                 a.href = URL.createObjectURL(new Blob([data]));
-                if (paths.length == 0)
-                    a.download = 'root.zip';
-                else
-                    a.download = paths[paths.length - 1] + '.zip'
+                console.log(paths)
+                a.download='folder.zip'
                 document.body.appendChild(a);
                 a.click();
                 a.remove();

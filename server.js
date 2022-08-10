@@ -130,7 +130,6 @@ http.createServer((req, res) => {
             });
             data = aesjs.utils.utf8.toBytes(data)
             data = cipher.encrypt(data)
-            data = aesjs.utils.hex.fromBytes(data)
             return res.end(data);
           }
           break
