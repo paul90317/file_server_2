@@ -48,3 +48,17 @@ c 就是指定加密的結果，digest 是摘要，nonce 是隨機碼，padding 
 * 絕對路徑重新命名，包含檔案及資料夾
 * 下載資料夾 (zip)
 * 刪除資料夾、檔案
+## 如何啟動
+安裝
+```sh
+npm init
+npm install
+```
+啟動
+```sh
+node server.js
+```
+建立 config 檔並且啟動
+```sh
+node server.js -a config.json
+```
