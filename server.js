@@ -167,7 +167,7 @@ http.createServer((req, res) => {
       res.setHeader('padding', data[0].toString())
       res.setHeader('digest', data[1])
       res.setHeader('status', '0')
-      return res.end(data[2]);
+      return res.end(Buffer.from(data[2]));
     }
     case 'file': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isFile()) {
@@ -180,7 +180,7 @@ http.createServer((req, res) => {
       res.setHeader('padding', data[0].toString())
       res.setHeader('digest', data[1])
       res.setHeader('status', '0')
-      return res.end(data[2]);
+      return res.end(Buffer.from(data[2]));
     }
     case 'zip': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory()) {
@@ -199,7 +199,7 @@ http.createServer((req, res) => {
         res.setHeader('padding', data[0].toString())
         res.setHeader('digest', data[1])
         res.setHeader('status', '0')
-        return res.end(data[2]);
+        return res.end(Buffer.from(data[2]));
       })
     }
     case 'upload': {
