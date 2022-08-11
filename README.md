@@ -23,7 +23,7 @@ function ivGen(Cnonce,Snonce){
     return aesjs.utils.hex.toBytes(sha256(Snonce+'*'+Cnonce)).slice(0,16)
 }
 ```
-server 確保每次 Cnonce 不一樣，就能抵禦重送攻擊。
+server 確保每次 Cnonce 不一樣，就能抵禦重送攻擊，當 server 重啟時會產生 Snonce，確保不會接受啟動前的重送封包。
 ## 信息摘要和加密
 client、server 為了確認自己的封包是對的，沒被改過，必須要用信息摘要伴隨密文送傳送。
 ![](https://i.imgur.com/0EkSpBf.png)  
