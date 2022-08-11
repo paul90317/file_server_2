@@ -36,6 +36,17 @@
         font-size: 24px;
         line-height: 28px
     }
+
+    #file{
+        display: none;
+    }
+
+    .btn {
+        font-size: 15px;
+        line-height: 22px;
+        cursor: pointer;
+        color:darkorange
+    }
 </style>
 <script>
     let paths = [];
@@ -237,7 +248,7 @@
         })
     }
     function deleteFile(click) {
-        if (prompt('Enter "delete" to comfirm.') != 'delete')
+        if (prompt('Enter "confirm" to delete.') != 'confirm')
             return alert('Cancel.')
         let path = '/rmfile/'
         for (let i in paths) {
@@ -257,7 +268,7 @@
         })
     }
     function deleteDir(click) {
-        if (prompt('Enter "delete" to comfirm.') != 'delete')
+        if (prompt('Enter "confirm" to delete.') != 'confirm')
             return alert('Cancel.')
         let path = '/rmdir/'
         for (let i in paths) {
@@ -324,8 +335,9 @@
 
 <body onload="updateDirGlobal('')">
     <div id="path"></div>
-    <input type="file" multiple="true" onchange="sendFile()" id="file"><br/>
-    <button onclick="createFolder()">Create new folder</button>
-    <button onclick="downloadZip()">Download Folder (zip)</button>
+    <input type="file" multiple="true" onchange="sendFile()" id="file">
+    <div onclick="document.getElementById('file').click()"class="btn">Upload files.</div>
+    <div onclick="createFolder()"class="btn">Create new folder.</div>
+    <div onclick="downloadZip()"class="btn">Download folder (zip).</div>
     <table id="content"></table>
 </body>
