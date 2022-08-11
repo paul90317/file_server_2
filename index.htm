@@ -49,9 +49,14 @@
     }
 </style>
 <script>
-    let paths = [];
-    let Snonce = '{server_code}'
-    let key = keyGen(prompt('Password: ', ''), Snonce)
+    var paths = [];
+    var Snonce = '{server_code}'
+    let password=null
+    while(password==null){
+        password=prompt('Password: ', '')
+    }
+    var key = keyGen(password, Snonce)
+    
     function status_statement(sc) {
         switch (sc) {
             case '0': return 'Command complete.'

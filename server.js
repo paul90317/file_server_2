@@ -1,14 +1,39 @@
-let port = 80;
-let folder = 'folder'
-let password = '123';
+var port = 80;
+var folder = 'folder'
+var password = '123';
+let config_filepath = 'config.json'
+let add_config = false
+
+for (let i = 2; i < process.argv.length; i++) {
+  if (process.argv[i] == '-a')
+    add_config = true;
+  else
+    config_filepath = process.argv[i]
+}
+
+const fs = require('fs')
+if (fs.existsSync(config_filepath)) {
+  let data = fs.readFileSync(config_filepath)
+  data = JSON.parse(data)
+  port = data.port
+  folder = data.folder
+  password = data.password
+}
+
+if (add_config) {
+  fs.writeFileSync(config_filepath, JSON.stringify({
+    folder: folder,
+    port: port,
+    password: password
+  }))
+}
 
 const aesjs = require('aes-js');
 const mc = require('./cipher')
 var Snonce = mc.random()
-var key = mc.keyGen(password,Snonce)
+var key = mc.keyGen(password, Snonce)
 var used_nonces = new Set();
 
-const fs = require('fs')
 if (!fs.existsSync(folder))
   fs.mkdirSync(folder)
 
@@ -51,6 +76,7 @@ function joinPath(paths) {
   return ret;
 }
 const jszip = require('jszip');
+const { argv } = require('process');
 
 function addFilesFromDirectoryToZip(BasePath, zip, ZipPath = '') {
   fs.readdirSync(BasePath).forEach(filename => {
@@ -87,9 +113,9 @@ http.createServer((req, res) => {
     res.setHeader('status', '1')
     return res.end()
   }
-  if(used_nonces.size>300){
+  if (used_nonces.size > 300) {
     Snonce = mc.random()
-    key = mc.keyGen(password,Snonce)
+    key = mc.keyGen(password, Snonce)
     used_nonces.clear();
   }
 
@@ -110,8 +136,8 @@ http.createServer((req, res) => {
 
   //parse request
   let paths = parsePath(url.path)
-  if (paths == null){
-    res.setHeader('status','5')
+  if (paths == null) {
+    res.setHeader('status', '5')
     return res.end()
   }
   let cmd = paths.shift();
@@ -119,7 +145,7 @@ http.createServer((req, res) => {
 
   //crud
   switch (cmd) {
-    case 'ls':{
+    case 'ls': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory()) {
         res.setHeader('status', '3')
         return res.end();
@@ -143,7 +169,7 @@ http.createServer((req, res) => {
       res.setHeader('status', '0')
       return res.end(data[2]);
     }
-    case 'file':{
+    case 'file': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isFile()) {
         res.setHeader('status', '3')
         return res.end();
@@ -156,7 +182,7 @@ http.createServer((req, res) => {
       res.setHeader('status', '0')
       return res.end(data[2]);
     }
-    case 'zip':{
+    case 'zip': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory()) {
         res.setHeader('status', '3')
         return res.end()
@@ -175,8 +201,8 @@ http.createServer((req, res) => {
         res.setHeader('status', '0')
         return res.end(data[2]);
       })
-    } 
-    case 'upload':{
+    }
+    case 'upload': {
       let data = [];
       if (fs.existsSync(filepath)) {
         res.setHeader('status', '3')
@@ -201,7 +227,7 @@ http.createServer((req, res) => {
         return res.end();
       });
     }
-    case 'mkdir':{
+    case 'mkdir': {
       if (fs.existsSync(filepath)) {
         res.setHeader('status', '3')
         return res.end();
@@ -215,7 +241,7 @@ http.createServer((req, res) => {
       res.setHeader('status', '0')
       return res.end();
     }
-    case 'rnfile':{
+    case 'rnfile': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isFile()) {
         res.setHeader('status', '3')
         return res.end()
@@ -239,7 +265,7 @@ http.createServer((req, res) => {
       res.setHeader('status', '0')
       return res.end();
     }
-    case 'rndir':{
+    case 'rndir': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory()) {
         res.setHeader('status', '3')
         return res.end()
@@ -263,7 +289,7 @@ http.createServer((req, res) => {
       res.setHeader('status', '0')
       return res.end()
     }
-    case 'rmfile':{
+    case 'rmfile': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isFile()) {
         res.setHeader('status', '3')
         return res.end()
@@ -272,7 +298,7 @@ http.createServer((req, res) => {
       res.setHeader('status', '0')
       return res.end()
     }
-    case 'rmdir':{
+    case 'rmdir': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory()) {
         res.setHeader('status', '3')
         return res.end()
@@ -285,7 +311,7 @@ http.createServer((req, res) => {
       res.setHeader('status', '0')
       return res.end()
     }
-    default:{
+    default: {
       res.setHeader('status', '4')
       return res.end();
     }
