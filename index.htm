@@ -198,7 +198,6 @@
         let files = document.getElementById('file').files;
         let txt = ''
         for (let i = 0; i < files.length; i++) {
-            let client_code = random();
             let body = await files[i].arrayBuffer()
             body = new Uint8Array(body)
             let Cnonce = random();
