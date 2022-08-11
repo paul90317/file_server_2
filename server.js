@@ -2,13 +2,11 @@ let port = 80;
 let folder = 'folder'
 let password = '123';
 
-const sha256 = require('js-sha256').sha256;
 const aesjs = require('aes-js');
 const mc = require('./cipher')
 var Snonce = mc.random()
 var key = mc.keyGen(password,Snonce)
 var used_nonces = new Set();
-
 
 const fs = require('fs')
 if (!fs.existsSync(folder))

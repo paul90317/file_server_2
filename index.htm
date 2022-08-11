@@ -85,6 +85,8 @@
             }
             data = new Uint8Array(data)
             data = cipher.decrypt([padding, digest, data])
+            if(data==null)
+                return alert('Client decryption error.')
             data = aesjs.utils.utf8.fromBytes(data)
             data = JSON.parse(data)
             //path
@@ -145,6 +147,8 @@
                 return status_code(sc)
             data = new Uint8Array(data)
             data = cipher.decrypt([padding, digest, data])
+            if(data==null)
+                return alert('Client decryption error.')
             let a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([data]));
             a.download = click;
@@ -176,6 +180,8 @@
                 return status_code(sc)
             data = new Uint8Array(data);
             data = cipher.decrypt([padding, digest, data])
+            if(data==null)
+                return alert('Client decryption error.')
             let a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([data]));
             a.download = 'folder.zip'

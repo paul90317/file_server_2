@@ -13,7 +13,7 @@
 ![](https://i.imgur.com/0EkSpBf.png) 
 (以上網址表示 ls 指令)  
 
-而 server 每次開機會產生新隨機碼 Snonce 以明文隨著腳本 (index.htm) 傳給 client，password 是不洩漏的 (現實通道)，產生 key,iv 的公式如下。
+而 server 每次開機會產生新隨機碼 Snonce 以明文型式隨著腳本 (index.htm) 傳給 client，password 是不洩漏的 (現實通道)，產生 key,iv 的公式如下。
 ```javascript
 function keyGen(password,Snonce){
     return aesjs.utils.hex.toBytes(sha256(password+'*'+Snonce))
@@ -24,9 +24,9 @@ function ivGen(Cnonce,Snonce){
 ```
 server 確保每次 Cnonce 不一樣，就能抵禦重送攻擊。
 ## 信息摘要和加密
-client、server 為了確認自己的封包是對的，沒被改過，必須做出信息摘要放訊息旁邊，一起加密
+client、server 為了確認自己的封包是對的，沒被改過，必須要用信息摘要伴隨密文送傳送。
 ![](https://i.imgur.com/0EkSpBf.png) 
-c 就是指定加密的結果，digest 是摘要，nonce 是隨機碼。
+c 就是指定加密的結果，digest 是摘要，nonce 是隨機碼，padding 是為了將明文填滿一個塊 (16 位元) 所隨機填充的位元組數量。
 ## 編碼流程
 以本伺服器最複雜的請求目錄為例子。
 1. client 做出 utf-8 請求字串，編碼 bits，進行摘要並加密，解碼成 16 進制字串 (utf-8)，傳送。
@@ -41,7 +41,7 @@ c 就是指定加密的結果，digest 是摘要，nonce 是隨機碼。
     "dirs":["d1","d2"]
 }
 ```
-![](https://i.imgur.com/dCn0WR5.png)
+![](https://i.imgur.com/JLIFBln.png)
 ## 功能
 * 順向訪問、逆向訪問 (透過 GUI)
 * 上傳 (多檔案)、下載檔案
