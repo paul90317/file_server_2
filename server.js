@@ -142,7 +142,7 @@ http.createServer((req, res) => {
   }
   let cmd = paths.shift();
   let filepath = joinPath(paths)
-
+  
   //crud
   switch (cmd) {
     case 'ls': {
