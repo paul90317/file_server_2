@@ -5,61 +5,112 @@
     integrity="sha512-LOqfKFwH2W3jeb0NzXcImFlSyoL7hjsWbZvIeKNOaZw1gFw+yKTE/QUDGLit2KWdd57qd6IgMDkppK2tkwIEhA=="
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="/chipher.js"></script>
+<style>
+    .link {
+        cursor: pointer;
+        color: blue;
+    }
+
+    .dir {
+        cursor: pointer;
+        color: yellowgreen;
+    }
+
+    .file {
+        cursor: pointer;
+        color: black;
+    }
+
+    .del {
+        cursor: pointer;
+        color: red;
+    }
+
+    .rn {
+        cursor: pointer;
+        color:blue
+    }
+
+    body {
+        font-family: Verdana, Arial, Helvetica, sans-serif;
+        font-size: 24px;
+        line-height: 28px
+    }
+</style>
 <script>
     let paths = [];
     let Snonce = '{server_code}'
-    let key = aesjs.utils.hex.toBytes(sha256(Snonce + '*' + prompt('password: ', '')))
-
-    function pack_url(cipher, url,Cnonce) {
-        let c = cipher.encrypt(aesjs.utils.utf8.toBytes(url))
-        c = aesjs.utils.hex.fromBytes(c)
-        return `/?c=${c}&nonce=${Cnonce}`
+    let key = keyGen(prompt('Password: ', ''), Snonce)
+    function status_statement(sc) {
+        switch (sc) {
+            case '0': return 'Command complete.'
+            case '1': return 'Replay package not allowed.'
+            case '2': return 'Server decryption error.'
+            case '3': return 'Path not found.'
+            case '4': return 'Command not found.'
+            case '5': return 'Path not allowed.'
+            case '6': return 'Command not allowed.'
+            default: return 'Status code not found.'
+        }
+    }
+    function status_code(sc) {
+        return alert(status_statement(sc))
+    }
+    function pack_url(cipher, url, Cnonce) {
+        let pack = cipher.encrypt(aesjs.utils.utf8.toBytes(url))
+        c = aesjs.utils.hex.fromBytes(pack[2])
+        return `/?c=${c}&nonce=${Cnonce}&padding=${pack[0]}&digest=${pack[1]}`
     }
     function updateDirGlobal(path) {
-        let url = '/dir/' + path
+        let url = '/ls/' + path
         let Cnonce = random();
-        let iv=ivGen(Cnonce,Snonce)
-        let cipher=new Cipher(key,iv)
-        url = pack_url(cipher,url,Cnonce);
-        fetch(url)
-            .then(res => {
-                return res.arrayBuffer();
-            })
-            .then(data => {
-                if (data.byteLength == 0)
-                    return alert('folder not found.')
-                try {
-                    data = cipher.decrypt(new Uint8Array(data))
-                    data = aesjs.utils.utf8.fromBytes(data)
-                    data = JSON.parse(data)
-                } catch (err) {
-                    console.log(err)
-                    return alert('folder not found.')
-                }
-                //path
-                let pathhtm = document.getElementById('path')
-                pathhtm.innerHTML = ''
-                paths = path.split('/')
-                path = ''
-                pathhtm.innerHTML += `<span onclick="updateDirGlobal('')">/</span>`
-                for (let i in paths) {
-                    if (paths[i] == '')
-                        continue
-                    path += paths[i] + '/'
-                    pathhtm.innerHTML += `<span onclick="updateDirGlobal('${path}')">${paths[i]}/</span>`
-                }
-                //content
-                files = data.files;
-                dirs = data.dirs;
-                let content = document.getElementById('content');
-                content.innerHTML = '';
-                for (let i in dirs) {
-                    content.innerHTML += `<div><span onclick="updateDirLocal('${dirs[i]}')">${dirs[i]}/</span>    <span onclick="deleteDir('${dirs[i]}')">delete</span>    <span onclick="renameDir('${dirs[i]}')">rename</span></div>`
-                }
-                for (let i in files) {
-                    content.innerHTML += `<div><span onclick="downloadFile('${files[i]}')">${files[i]}</span>    <span onclick="deleteFile('${files[i]}')">delete</span>    <span onclick="renameFile('${files[i]}')">rename</span></div>`
-                }
-            })
+        let iv = ivGen(Cnonce, Snonce)
+        let cipher = new Cipher(key, iv)
+        url = pack_url(cipher, url, Cnonce);
+        let digest, padding, sc
+        fetch(url, {
+            method: 'GET'
+        }).then(res => {
+            digest = res.headers.get('digest')
+            padding = parseInt(res.headers.get('padding'))
+            sc = res.headers.get('status')
+            return res.arrayBuffer();
+        }).then(data => {
+
+            if (sc != '0') {
+                status_code(sc)
+                if (sc == '2')
+                    return location.reload()
+                return
+            }
+            data = new Uint8Array(data)
+            data = cipher.decrypt([padding, digest, data])
+            data = aesjs.utils.utf8.fromBytes(data)
+            data = JSON.parse(data)
+            //path
+            let pathhtm = document.getElementById('path')
+            pathhtm.innerHTML = ''
+            paths = path.split('/')
+            path = ''
+            pathhtm.innerHTML += `<span onclick="updateDirGlobal('')" class="link">/     </span>`
+            for (let i in paths) {
+                if (paths[i] == '')
+                    continue
+                path += paths[i] + '/'
+                pathhtm.innerHTML += `<span onclick="updateDirGlobal('${path}')" class="link">${paths[i]}/     </span>`
+            }
+            //content
+            files = data.files;
+            dirs = data.dirs;
+            let content = document.getElementById('content');
+            content.innerHTML = '';
+            for (let i in dirs) {
+                content.innerHTML += `<tr><td onclick="updateDirLocal('${dirs[i]}')" class="dir">${dirs[i]}/</td><td onclick="deleteDir('${dirs[i]}')"class="del">delete</td><td onclick="renameDir('${dirs[i]}')"class="rn">rename</td></tr>`
+            }
+            for (let i in files) {
+                content.innerHTML += `<tr><td onclick="downloadFile('${files[i]}')" class="file">${files[i]}</td><td onclick="deleteFile('${files[i]}')"class="del">delete</td><td onclick="renameFile('${files[i]}')"class="rn">rename</td></tr>`
+            }
+        })
     }
     function updateDirLocal(click) {
         let path = ''
@@ -78,29 +129,29 @@
         path += click
         let url = '/file/' + path;
         let Cnonce = random();
-        let iv=ivGen(Cnonce,Snonce)
-        let cipher=new Cipher(key,iv)
-        url = pack_url(cipher,url,Cnonce);
-        fetch(url)
-            .then(res => {
-                return res.blob();
-            })
-            .then(blob => {
-                return blob.arrayBuffer();
-            })
-            .then(data => {
-                if (data.byteLength == 0)
-                    return alert('empty file.')
-                data = new Uint8Array(data)
-                data = cipher.decrypt(data)
-                let a = document.createElement('a');
-                blob = new Blob([data])
-                a.href = URL.createObjectURL(blob);
-                a.download = click;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            })
+        let iv = ivGen(Cnonce, Snonce)
+        let cipher = new Cipher(key, iv)
+        url = pack_url(cipher, url, Cnonce);
+        let digest, padding, sc
+        fetch(url, {
+            method: 'GET'
+        }).then(res => {
+            digest = res.headers.get('digest')
+            padding = parseInt(res.headers.get('padding'))
+            sc = res.headers.get('status')
+            return res.arrayBuffer();
+        }).then(data => {
+            if (sc != '0')
+                return status_code(sc)
+            data = new Uint8Array(data)
+            data = cipher.decrypt([padding, digest, data])
+            let a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([data]));
+            a.download = click;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        })
     }
     function downloadZip() {
         let path = ''
@@ -109,32 +160,32 @@
         }
         let url = '/zip/' + path;
         let Cnonce = random();
-        let iv=ivGen(Cnonce,Snonce)
-        let cipher=new Cipher(key,iv)
-        url = pack_url(cipher,url,Cnonce);
-        fetch(url)
-            .then(res => {
-                return res.blob();
-            })
-            .then(blob => {
-                return blob.arrayBuffer();
-            })
-            .then(data => {
-                if (data.byteLength == 0)
-                    return alert('empty file.')
-                data = new Uint8Array(data);
-                data = cipher.decrypt(data)
-                let a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([data]));
-                console.log(paths)
-                a.download='folder.zip'
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            })
+        let iv = ivGen(Cnonce, Snonce)
+        let cipher = new Cipher(key, iv)
+        url = pack_url(cipher, url, Cnonce);
+        let padding, digest, sc
+        fetch(url, {
+            method: 'GET'
+        }).then(res => {
+            padding = parseInt(res.headers.get('padding'))
+            digest = res.headers.get('digest')
+            sc = res.headers.get('status')
+            return res.arrayBuffer();
+        }).then(data => {
+            if (sc != '0')
+                return status_code(sc)
+            data = new Uint8Array(data);
+            data = cipher.decrypt([padding, digest, data])
+            let a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([data]));
+            a.download = 'folder.zip'
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        })
     }
     async function sendFile() {
-        let path = '/file/'
+        let path = '/upload/'
         for (let i in paths) {
             path += paths[i] + '/'
         }
@@ -144,17 +195,17 @@
             let client_code = random();
             let body = await files[i].arrayBuffer()
             body = new Uint8Array(body)
-            let url=path + files[i].name
             let Cnonce = random();
-            let iv=ivGen(Cnonce,Snonce)
-            let cipher=new Cipher(key,iv)
-            url = pack_url(cipher,url,Cnonce);
+            let iv = ivGen(Cnonce, Snonce)
+            let cipher = new Cipher(key, iv)
             body = cipher.encrypt(body)
+            let url = `${path + files[i].name}?padding=${body[0]}&digest=${body[1]}`
+            url = pack_url(cipher, url, Cnonce);
             let res = await fetch(url, {
-                body: body,
+                body: body[2],
                 method: 'POST'
             })
-            txt += (await res.text()) + '\n';
+            txt += status_statement(res.headers.get('status')) + '\n';
         }
         alert(txt)
         updateDirLocal('')
@@ -165,57 +216,60 @@
             if (paths[i] != '')
                 path += paths[i] + '/'
         }
-        path = prompt('Folder path: ', path);;
-        let url = '/dir' + path;
+        path = prompt('Folder path: ', path)
+        if (path == null)
+            return alert('Cancel.')
+        let url = '/mkdir' + path;
         let Cnonce = random();
-        let iv=ivGen(Cnonce,Snonce)
-        let cipher=new Cipher(key,iv)
-        url = pack_url(cipher,url,Cnonce);
+        let iv = ivGen(Cnonce, Snonce)
+        let cipher = new Cipher(key, iv)
+        url = pack_url(cipher, url, Cnonce);
         fetch(url, {
-            method: 'POST'
-        }).then(res => res.text())
-            .then(txt => {
-                alert(txt)
-                updateDirLocal('')
-            })
+            method: 'PUT'
+        }).then(res => {
+            status_code(res.headers.get('status'))
+            updateDirLocal('')
+        })
     }
     function deleteFile(click) {
-        let path = '/file/'
+        if (prompt('Enter "delete" to comfirm.') != 'delete')
+            return alert('Cancel.')
+        let path = '/rmfile/'
         for (let i in paths) {
             path += paths[i] + '/'
         }
         path += click
         let url = path
         let Cnonce = random();
-        let iv=ivGen(Cnonce,Snonce)
-        let cipher=new Cipher(key,iv)
-        url = pack_url(cipher,url,Cnonce);
+        let iv = ivGen(Cnonce, Snonce)
+        let cipher = new Cipher(key, iv)
+        url = pack_url(cipher, url, Cnonce);
         fetch(url, {
             method: 'DELETE'
-        }).then(res => res.text())
-            .then(txt => {
-                alert(txt)
-                updateDirLocal('')
-            })
+        }).then(res => {
+            status_code(res.headers.get('status'))
+            updateDirLocal('')
+        })
     }
     function deleteDir(click) {
-        let path = '/dir/'
+        if (prompt('Enter "delete" to comfirm.') != 'delete')
+            return alert('Cancel.')
+        let path = '/rmdir/'
         for (let i in paths) {
             path += paths[i] + '/'
         }
         path += click
         let url = path
         let Cnonce = random();
-        let iv=ivGen(Cnonce,Snonce)
-        let cipher=new Cipher(key,iv)
-        url = pack_url(cipher,url,Cnonce);
+        let iv = ivGen(Cnonce, Snonce)
+        let cipher = new Cipher(key, iv)
+        url = pack_url(cipher, url, Cnonce);
         fetch(url, {
             method: 'DELETE'
-        }).then(res => res.text())
-            .then(txt => {
-                alert(txt)
-                updateDirLocal('')
-            })
+        }).then(res => {
+            status_code(res.headers.get('status'))
+            updateDirLocal('')
+        })
     }
     function renameDir(click) {
         let path = '/'
@@ -225,18 +279,19 @@
         }
         path += click
         newpath = prompt('New folder name: ', path)
-        let url = '/dir' + path + '?newpath=' + newpath
+        if (newpath == null)
+            return alert('Cancel.')
+        let url = '/rndir' + path + '?newpath=' + newpath
         let Cnonce = random();
-        let iv=ivGen(Cnonce,Snonce)
-        let cipher=new Cipher(key,iv)
-        url = pack_url(cipher,url,Cnonce);
+        let iv = ivGen(Cnonce, Snonce)
+        let cipher = new Cipher(key, iv)
+        url = pack_url(cipher, url, Cnonce);
         fetch(url, {
             method: 'PATCH'
-        }).then(res => res.text())
-            .then(txt => {
-                alert(txt)
-                updateDirLocal('')
-            })
+        }).then(res => {
+            status_code(res.headers.get('status'))
+            updateDirLocal('')
+        })
     }
     function renameFile(click) {
         let path = '/'
@@ -246,25 +301,26 @@
         }
         path += click
         newpath = prompt('New file name: ', path)
-        let url = '/file' + path + '?newpath=' + newpath
+        if (newpath == null)
+            return alert('Cancel.')
+        let url = '/rnfile' + path + '?newpath=' + newpath
         let Cnonce = random();
-        let iv=ivGen(Cnonce,Snonce)
-        let cipher=new Cipher(key,iv)
-        url = pack_url(cipher,url,Cnonce);
+        let iv = ivGen(Cnonce, Snonce)
+        let cipher = new Cipher(key, iv)
+        url = pack_url(cipher, url, Cnonce);
         fetch(url, {
             method: 'PATCH'
-        }).then(res => res.text())
-            .then(txt => {
-                alert(txt)
-                updateDirLocal('')
-            })
+        }).then(res => {
+            status_code(res.headers.get('status'))
+            updateDirLocal('')
+        })
     }
 </script>
 
 <body onload="updateDirGlobal('')">
     <div id="path"></div>
-    <input type="file" multiple="true" onchange="sendFile()" id="file">
+    <input type="file" multiple="true" onchange="sendFile()" id="file"><br/>
     <button onclick="createFolder()">Create new folder</button>
     <button onclick="downloadZip()">Download Folder (zip)</button>
-    <div id="content"></div>
+    <table id="content"></table>
 </body>

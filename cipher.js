@@ -9,34 +9,62 @@ function ivGen(Cnonce,Snonce){
 }
 class Cipher{
     constructor(key,iv){
-        this.cipher=new aesjs.ModeOfOperation.cbc(key,iv)
+        this.key=key
+        this.iv=iv
     }
     encrypt(data){
-        let len=data.byteLength+9//8+1
+        let cipher=new aesjs.ModeOfOperation.cbc(this.key,this.iv)
+        let len=data.byteLength
         let rem=len%16
-        if(rem!=0){
-            len+=16-rem
-        }
+        let padding=(16-rem)%16
+        len+=padding
         let ret=new Uint8Array(len)
-        ret.set(new Uint8Array([(16-rem)%16]),0)
-        ret.set(aesjs.utils.hex.toBytes(sha256(data)).slice(3,11),1)
-        ret.set(data,9)
-        ret=this.cipher.encrypt(ret)
-        return ret
+        ret.set(data,0)
+        for(let i=ret.byteLength-padding;i<ret.byteLength;i++)
+            ret[i]=random()%256
+        //console.log(1,ret)
+        ret=cipher.encrypt(ret)
+        //console.log(2,ret)
+        return [padding,sha256(data),ret]//cpack
     }
-    decrypt(data){
-        data=this.cipher.decrypt(data)
-        let rem= data[0]
-        let digest=aesjs.utils.hex.fromBytes(data.subarray(1,9))
-        if(9>=data.byteLength-rem)
+    decrypt(cpack){
+        let cipher=new aesjs.ModeOfOperation.cbc(this.key,this.iv)
+        let padding=cpack[0]
+        let digest=cpack[1]
+        let data=cpack[2]
+        //console.log(3,data)
+        data=cipher.decrypt(data)
+        //console.log(4,data)
+        if(data.byteLength-padding<0)
             return null
-        data=data.subarray(9,data.byteLength-rem)
-        if(sha256(data).substring(6,22)==digest)
-            return data
-        return null
+        data=data.subarray(0,data.byteLength-padding)
+        if(sha256(data)!=digest)
+            return null
+        return data
     }
 }
+class StreamChipher{
+    constructor(key){
+        this.key=key
+    }
+    
+    encrypt(streamIn,streamOut,iv){
+        let first=true;
+        streamIn.on('data',chunk=>{
+            if(first){
+                first=false;
+                
+            }else{
 
+            }
+        }).on('end',()=>{
+
+        })
+    }
+    decrypt(streamIn,streamOut){
+        
+    }
+}
 if(typeof module === 'object'){
     var sha256 = require('js-sha256').sha256;
     var aesjs = require('aes-js');
