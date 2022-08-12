@@ -46,7 +46,7 @@ client 請求檔案、改檔名、刪檔、創資料夾
 * ***In URL:*** $K_{p,c,s}(m_0),\ H(m_0),\ p_0,\ c$  
 
 client 上傳檔案  
-* ***In URL:*** $K_{p,c,s}(m_0,\ H(m_1),\ p_1),\ H(m_0),\ p_0,\ c$  
+* ***In URL:*** $K_{p,c,s}(m_0,\ H(m_1),\ p_1),\ H(m_0,\ H(m_1),\ p_1),\ p_0,\ c$  
 * ***In body:*** $K_{p,c,s}(m_1)$  
 
 server 回傳 response
