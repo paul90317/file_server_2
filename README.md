@@ -88,3 +88,5 @@ node server.js
 ```sh
 node server.js -a config.json
 ```
+## 串流
+考慮到樹梅派記憶體小，如果是將檔案直接讀到記憶體加密，可能會爆掉，所以我採用串流方式讀檔，到達一個塊就加密。
