@@ -50,7 +50,7 @@ client 上傳檔案
 * ***In body:*** $K_{p,c,s}(m_1)$  
 
 server 回傳 response
-* ***In headers:*** $K_{p,c,s}(c_2),\ p_2$  
+* ***In headers:*** $H(m_2),\ p_2$  
 * ***In body:*** $K_{p,c,s}(m_2)$ 
 
 ## 編碼流程
