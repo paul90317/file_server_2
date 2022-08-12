@@ -11,8 +11,8 @@
 ## 重送攻擊
 又稱 replay attack，是本伺服器抵禦的重點之一。發生時機是，每次都是由 client 傳送請求，server 再做對檔案操作，並回應 client。就算過程加密，駭客拿 client 請求封包，重新發送，控制 server 完成檔案操作，即便對他沒有意義。url 中，client 將真實的請求加密，並且附帶明文隨機碼 Cnonce，  
 
->http://127.0.0.1/?c=12685cb59d7229d9f0bb9fbe6120e115&nonce=3675955&padding=7&digest=2b93c1030be447de1f5909bf223180e8277116051f58651bac64e974d60c5e5a
-![](https://i.imgur.com/0EkSpBf.png) 
+>http://127.0.0.1/?c=12685cb59d7229d9f0bb9fbe6120e115&nonce=3675955&padding=7&digest=2b93c1030be447de1f5909bf223180e8277116051f58651bac64e974d60c5e5a  
+![](https://i.imgur.com/0EkSpBf.png)  
 (以上網址表示 ls 指令)  
 
 ### 密鑰生成
@@ -40,22 +40,26 @@ c 就是密文，digest 是摘要，nonce 是隨機碼，padding 是為了將明
 它不只解密而且可以由摘要(雜湊值)驗證封包是否被駭客修改。  
 加密解密簡寫成 $K(m),\ K^{-1}(c,\ d,\ p)$
 
-* server 傳送帶有 $ns$ 的 index.htm  
+#### server 傳送帶有 $ns$ 的 index.htm  
 In javascript: $ns$
-* client 傳送的 CRUD 命令 $m_0$  
+#### client 傳送的 CRUD 命令 $m_0$  
 >$(c_0,\ d_0,\ p_0)\ =\ K(m_0)$  
+
 In URL: $c_0,\ d_0\,\ p_0,\ nc$  
-* client 上傳檔案  
+#### client 上傳檔案  
 先將 body (檔案) $m_1$ 加密  
 >$(c_1,\ d_1,\ p_1)\ =\ K(m_1)$  
+
 將路徑訊息 $m_0$ 與 $d_1,\ p_1$ 組合成 $m_0'$  
 >$m_0'\ =\ (m_0,\ d_1,\ p_1)$  
+
 將 $m_0'$ 加密  
 >$(c_0',\ d_0',\ p_0')\ =\ K(m_0')$  
+
 In URL: $c_0',\ d_0',\ p_0',\ nc$  
 In body: $c_1$  
 
-* server 回傳 response $m_2$  
+#### server 回傳 response $m_2$  
 In headers: $d_2,\ p_2$  
 In body: $c_2$  
 
