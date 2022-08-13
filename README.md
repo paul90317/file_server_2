@@ -1,7 +1,7 @@
 # 加密檔案伺服器
 這不是一般的檔案伺服器，這是為了讓使用者在沒有 https 的情況下安全通訊，如果有漏洞 (無論是對 client 或是 server 而言)，歡迎回報。  
 ### 動機
-對 nas 有興趣，於是自己在家設定路由，買樹梅派，建立自己的檔案伺服器。
+對 NAS 有興趣，於是自己在家設定路由，買樹莓派，建立自己的檔案伺服器。
 ## 密鑰分發
 本伺服器是依靠 server、和 client 都知道密碼的情況下，用該密碼 (password) 與其他隨機碼 (nonce) 產生對稱金鑰 (Session Key) 通訊。一開始會要求使用者輸入密碼。加密演算法 AES，模式 CBC，需要 key、iv，之後會提到如何產生。
 信息摘要演算法 sha256
@@ -33,7 +33,7 @@ c 就是密文，digest 是摘要，nonce 是隨機碼，padding 是為了將明
 **加密程式** $(c,\ d,\ p)\ =\ K_{nc,\ ns,\ psw}(m)$ 代表以 $nc,\ ns,\ psw$ 做成起始向量以及密鑰進行加密 (詳請看 [密鑰生成](#密鑰生成)) ，應該要產生 $(c,\ d,\ p)$，也就是 密文、摘要、填充數 (注意，並沒有一種加密演算法可以將明文轉成密文又產生雜湊值，是 AES 產生密文和填充，而 SHA256 生成明文雜湊值，而我的加密程式就是做這兩件事)。而解密就是 $m\ =\ K^{-1}_{nc,\ ns,\ psw}(c,\ d,\ p)$，它不只解密而且可以由摘要(雜湊值)驗證封包是否被駭客修改。加密、解密簡寫成 $K(m)$、 $K^{-1}(c,\ d,\ p)$。SHA256 不會對加密的 padding 進行雜湊，否則駭客可以透過修改 padding 長度來偽造明文。 
 ### 加密  
 ![](https://i.imgur.com/sGIDCgi.png)
-###  解密  
+### 解密  
 ![](https://i.imgur.com/vLSHtBS.png) 
 ## 訊息傳送
 ### server 傳送帶有 $ns$ 的 index.htm  
@@ -66,7 +66,7 @@ c 就是密文，digest 是摘要，nonce 是隨機碼，padding 是為了將明
 3. server 將 dictionary 序列化成字串 (utf-8)，編碼成 bits，摘要並加密，傳送。
 4. client 收到 bits，解密並確認摘要，解碼成 utf-8，反序列化成 dictionary。
 
-接這就用 dictionary 渲染網頁，結構如下
+接著就用 dictionary 渲染網頁，結構如下
 ```json
 {
     "files":["fa.txt","fb.txt"],
