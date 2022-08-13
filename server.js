@@ -13,13 +13,15 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 
 const fs = require('fs')
-if (fs.existsSync(config_filepath)) {
+try{
   let data = fs.readFileSync(config_filepath)
   data = JSON.parse(data)
-  port = data.port
-  folder = data.folder
-  password = data.password
-  admin=data.admin
+  if(data.port!=undefined)port = data.port
+  if(data.folder!=undefined)folder = data.folder
+  if(data.password!=undefined)password = data.password
+  if(data.admin!=undefined)admin=data.admin
+}catch(err){
+  console.log(err)
 }
 
 if (add_config) {
