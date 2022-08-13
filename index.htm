@@ -47,16 +47,21 @@
         cursor: pointer;
         color:darkorange
     }
+    .hide {
+        display: none;
+    }
 </style>
 <script>
     var paths = [];
     var Snonce = '{server_code}'
     let password=null
+    let user=null
+    while(user==null){
+        user=prompt('User: ', 'guest')
+    }
     while(password==null){
         password=prompt('Password: ', '')
     }
-    var key = keyGen(password, Snonce)
-    
     function status_statement(sc) {
         switch (sc) {
             case '0': return 'Command complete.'
@@ -73,15 +78,17 @@
         return alert(status_statement(sc))
     }
     function pack_url(cipher, url, Cnonce) {
+        if(url.indexOf('?')==-1)
+            url+=`?user=${cipher.hashf(user)}`
+        else url+=`&user=${cipher.hashf(user)}`
         let pack = cipher.encrypt(aesjs.utils.utf8.toBytes(url))
         c = aesjs.utils.hex.fromBytes(pack[2])
         return `/?c=${c}&nonce=${Cnonce}&padding=${pack[0]}&digest=${pack[1]}`
     }
     function updateDirGlobal(path) {
         let url = '/ls/' + path
-        let Cnonce = random();
-        let iv = ivGen(Cnonce, Snonce)
-        let cipher = new Cipher(key, iv)
+        let Cnonce=random()
+        let cipher = new Cipher(password, Cnonce,Snonce)
         url = pack_url(cipher, url, Cnonce);
         let digest, padding, sc
         fetch(url, {
@@ -146,11 +153,12 @@
         }
         path += click
         let url = '/file/' + path;
-        let Cnonce = random();
-        let iv = ivGen(Cnonce, Snonce)
-        let cipher = new Cipher(key, iv)
+        let Cnonce=random()
+        let cipher = new Cipher(password, Cnonce,Snonce)
         url = pack_url(cipher, url, Cnonce);
         let digest, padding, sc
+        document.getElementById('wait').classList.remove('hide')
+        document.getElementById('op').classList.add('hide')
         fetch(url, {
             method: 'GET'
         }).then(res => {
@@ -171,6 +179,8 @@
             document.body.appendChild(a);
             a.click();
             a.remove();
+            document.getElementById('wait').classList.add('hide')
+            document.getElementById('op').classList.remove('hide')
         })
     }
     function downloadZip() {
@@ -179,11 +189,12 @@
             path += paths[i] + '/'
         }
         let url = '/zip/' + path;
-        let Cnonce = random();
-        let iv = ivGen(Cnonce, Snonce)
-        let cipher = new Cipher(key, iv)
+        let Cnonce=random()
+        let cipher = new Cipher(password, Cnonce,Snonce)
         url = pack_url(cipher, url, Cnonce);
         let padding, digest, sc
+        document.getElementById('wait').classList.remove('hide')
+        document.getElementById('op').classList.add('hide')
         fetch(url, {
             method: 'GET'
         }).then(res => {
@@ -204,6 +215,8 @@
             document.body.appendChild(a);
             a.click();
             a.remove();
+            document.getElementById('wait').classList.add('hide')
+            document.getElementById('op').classList.remove('hide')
         })
     }
     async function sendFile() {
@@ -213,12 +226,13 @@
         }
         let files = document.getElementById('file').files;
         let txt = ''
+        document.getElementById('wait').classList.remove('hide')
+        document.getElementById('op').classList.add('hide')
         for (let i = 0; i < files.length; i++) {
             let body = await files[i].arrayBuffer()
             body = new Uint8Array(body)
-            let Cnonce = random();
-            let iv = ivGen(Cnonce, Snonce)
-            let cipher = new Cipher(key, iv)
+            let Cnonce=random()
+            let cipher = new Cipher(password, Cnonce,Snonce)
             body = cipher.encrypt(body)
             let url = `${path + files[i].name}?padding=${body[0]}&digest=${body[1]}`
             url = pack_url(cipher, url, Cnonce);
@@ -226,8 +240,10 @@
                 body: body[2],
                 method: 'POST'
             })
-            txt += status_statement(res.headers.get('status')) + '\n';
+            txt += `${files[i].name}: ${status_statement(res.headers.get('status'))}\n`;
         }
+        document.getElementById('wait').classList.add('hide')
+        document.getElementById('op').classList.remove('hide')
         alert(txt)
         updateDirLocal('')
     }
@@ -241,9 +257,8 @@
         if (path == null)
             return alert('Cancel.')
         let url = '/mkdir' + path;
-        let Cnonce = random();
-        let iv = ivGen(Cnonce, Snonce)
-        let cipher = new Cipher(key, iv)
+        let Cnonce=random()
+        let cipher = new Cipher(password, Cnonce,Snonce)
         url = pack_url(cipher, url, Cnonce);
         fetch(url, {
             method: 'PUT'
@@ -261,9 +276,8 @@
         }
         path += click
         let url = path
-        let Cnonce = random();
-        let iv = ivGen(Cnonce, Snonce)
-        let cipher = new Cipher(key, iv)
+        let Cnonce=random()
+        let cipher = new Cipher(password, Cnonce,Snonce)
         url = pack_url(cipher, url, Cnonce);
         fetch(url, {
             method: 'DELETE'
@@ -281,9 +295,8 @@
         }
         path += click
         let url = path
-        let Cnonce = random();
-        let iv = ivGen(Cnonce, Snonce)
-        let cipher = new Cipher(key, iv)
+        let Cnonce=random()
+        let cipher = new Cipher(password, Cnonce,Snonce)
         url = pack_url(cipher, url, Cnonce);
         fetch(url, {
             method: 'DELETE'
@@ -303,9 +316,8 @@
         if (newpath == null)
             return alert('Cancel.')
         let url = '/rndir' + path + '?newpath=' + newpath
-        let Cnonce = random();
-        let iv = ivGen(Cnonce, Snonce)
-        let cipher = new Cipher(key, iv)
+        let Cnonce=random()
+        let cipher = new Cipher(password, Cnonce,Snonce)
         url = pack_url(cipher, url, Cnonce);
         fetch(url, {
             method: 'PATCH'
@@ -325,9 +337,8 @@
         if (newpath == null)
             return alert('Cancel.')
         let url = '/rnfile' + path + '?newpath=' + newpath
-        let Cnonce = random();
-        let iv = ivGen(Cnonce, Snonce)
-        let cipher = new Cipher(key, iv)
+        let Cnonce=random()
+        let cipher = new Cipher(password, Cnonce,Snonce)
         url = pack_url(cipher, url, Cnonce);
         fetch(url, {
             method: 'PATCH'
@@ -339,10 +350,15 @@
 </script>
 
 <body onload="updateDirGlobal('')">
-    <div id="path"></div>
-    <input type="file" multiple="true" onchange="sendFile()" id="file">
-    <div onclick="document.getElementById('file').click()"class="btn">Upload files.</div>
-    <div onclick="createFolder()"class="btn">Create new folder.</div>
-    <div onclick="downloadZip()"class="btn">Download folder (zip).</div>
-    <table id="content"></table>
+    <div id="op">
+        <div id="path"></div>
+        <input type="file" multiple="true" onchange="sendFile()" id="file">
+        <div onclick="document.getElementById('file').click()"class="btn">Upload files.</div>
+        <div onclick="createFolder()"class="btn">Create new folder.</div>
+        <div onclick="downloadZip()"class="btn">Download folder (zip).</div>
+        <table id="content"></table>
+    </div>
+    <h1 id="wait"class="hide">
+        Waiting...
+    </h1>
 </body>

@@ -1,6 +1,7 @@
 var port = 80;
 var folder = 'folder'
 var password = '123';
+var admin='paul90317'
 let config_filepath = 'config.json'
 let add_config = false
 
@@ -18,20 +19,21 @@ if (fs.existsSync(config_filepath)) {
   port = data.port
   folder = data.folder
   password = data.password
+  admin=data.admin
 }
 
 if (add_config) {
   fs.writeFileSync(config_filepath, JSON.stringify({
     folder: folder,
     port: port,
-    password: password
+    password: password,
+    admin:admin
   }))
 }
 
 const aesjs = require('aes-js');
 const mc = require('./cipher')
 var Snonce = mc.random()
-var key = mc.keyGen(password, Snonce)
 var used_nonces = new Set();
 
 if (!fs.existsSync(folder))
@@ -76,7 +78,6 @@ function joinPath(paths) {
   return ret;
 }
 const jszip = require('jszip');
-const { argv } = require('process');
 
 function addFilesFromDirectoryToZip(BasePath, zip, ZipPath = '') {
   fs.readdirSync(BasePath).forEach(filename => {
@@ -91,14 +92,19 @@ function addFilesFromDirectoryToZip(BasePath, zip, ZipPath = '') {
 
 http.createServer((req, res) => {
   //handle cipher
-  let url = parseURL(req.url)
-  let Cnonce = url.params.nonce
-  let ciphertext = url.params.c
-  let digest = url.params.digest
-  let padding = parseInt(url.params.padding)
+  let parseError=false
+  try{
+    var url = parseURL(req.url)
+    var Cnonce = url.params.nonce
+    var ciphertext = url.params.c
+    var digest = url.params.digest
+    var padding = parseInt(url.params.padding)
+  }catch(err){
+    parseError=true
+  }
 
   //check format
-  if (Cnonce == undefined || ciphertext == undefined || digest == undefined || padding == undefined)
+  if (parseError||Cnonce == undefined || ciphertext == undefined || digest == undefined || padding == undefined)
     if (req.method == 'GET') {
       if (req.url == '/')
         return res.end(fs.readFileSync(__dirname + '/index.htm').toString().replace('{server_code}', Snonce))
@@ -120,8 +126,7 @@ http.createServer((req, res) => {
   }
 
   //decrypt request
-  let iv = mc.ivGen(Cnonce, Snonce)
-  let cipher = new mc.Cipher(key, iv)
+  let cipher = new mc.Cipher(password, Cnonce,Snonce)
   try {
     let data = aesjs.utils.hex.toBytes(ciphertext)
     data = cipher.decrypt([padding, digest, data])
@@ -175,7 +180,6 @@ http.createServer((req, res) => {
         return res.end();
       }
       let data = fs.readFileSync(filepath);
-      data = new Uint8Array(data)
       data = cipher.encrypt(data)
       res.setHeader('padding', data[0].toString())
       res.setHeader('digest', data[1])
@@ -194,7 +198,7 @@ http.createServer((req, res) => {
       return stream.on('data', chunk => {
         data.push(chunk)
       }).on('end', () => {
-        data = new Uint8Array(Buffer.concat(data))
+        data = Buffer.concat(data)
         data = cipher.encrypt(data)
         res.setHeader('padding', data[0].toString())
         res.setHeader('digest', data[1])
@@ -203,6 +207,10 @@ http.createServer((req, res) => {
       })
     }
     case 'upload': {
+      if(cipher.hashf(admin)!=url.params.user){
+        res.setHeader('status', '6')
+        return res.end()
+      }
       let data = [];
       if (fs.existsSync(filepath)) {
         res.setHeader('status', '3')
@@ -217,6 +225,10 @@ http.createServer((req, res) => {
           digest = url.params.digest
           padding = parseInt(url.params.padding)
           data = cipher.decrypt([padding, digest, data])
+          if(data==null){
+            res.setHeader('status', '2')
+            return res.end();
+          }
           fs.writeFileSync(filepath, data, { flag: 'w+' });
         } catch (err) {
           console.log(err)
@@ -228,6 +240,10 @@ http.createServer((req, res) => {
       });
     }
     case 'mkdir': {
+      if(cipher.hashf(admin)!=url.params.user){
+        res.setHeader('status', '6')
+        return res.end()
+      }
       if (fs.existsSync(filepath)) {
         res.setHeader('status', '3')
         return res.end();
@@ -242,6 +258,10 @@ http.createServer((req, res) => {
       return res.end();
     }
     case 'rnfile': {
+      if(cipher.hashf(admin)!=url.params.user){
+        res.setHeader('status', '6')
+        return res.end()
+      }
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isFile()) {
         res.setHeader('status', '3')
         return res.end()
@@ -266,6 +286,10 @@ http.createServer((req, res) => {
       return res.end();
     }
     case 'rndir': {
+      if(cipher.hashf(admin)!=url.params.user){
+        res.setHeader('status', '6')
+        return res.end()
+      }
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory()) {
         res.setHeader('status', '3')
         return res.end()
@@ -290,6 +314,10 @@ http.createServer((req, res) => {
       return res.end()
     }
     case 'rmfile': {
+      if(cipher.hashf(admin)!=url.params.user){
+        res.setHeader('status', '6')
+        return res.end()
+      }
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isFile()) {
         res.setHeader('status', '3')
         return res.end()
@@ -299,6 +327,10 @@ http.createServer((req, res) => {
       return res.end()
     }
     case 'rmdir': {
+      if(cipher.hashf(admin)!=url.params.user){
+        res.setHeader('status', '6')
+        return res.end()
+      }
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory()) {
         res.setHeader('status', '3')
         return res.end()

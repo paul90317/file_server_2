@@ -8,16 +8,15 @@ if (typeof module === 'object') {
 function random() {
     return Math.floor(Math.random() * 100000000);
 }
-function keyGen(password, Snonce) {
-    return aesjs.utils.hex.toBytes(sha256(password + '*' + Snonce))
-}
-function ivGen(Cnonce, Snonce) {
-    return aesjs.utils.hex.toBytes(sha256(Snonce + '*' + Cnonce)).slice(0, 16)
-}
+
 class Cipher {
-    constructor(key, iv) {
-        this.key = key
-        this.iv = iv
+    constructor(password,Cnonce,Snonce) {
+        this.key = aesjs.utils.hex.toBytes(sha256(Cnonce+'*'+password + '*' + Snonce))
+        this.iv = aesjs.utils.hex.toBytes(sha256(Snonce + '*' + Cnonce)).slice(0, 16)
+        this.salt=sha256(Cnonce + '*' + Snonce)
+    }
+    hashf(data) {
+        return sha256(this.salt+sha256(data))
     }
     encrypt(data) {
         let cipher = new aesjs.ModeOfOperation.cbc(this.key, this.iv)
@@ -28,7 +27,7 @@ class Cipher {
         let ret = new Uint8Array(len)
         ret.set(data, 0)
         ret = cipher.encrypt(ret)
-        return [padding, sha256(data), ret]//cpack
+        return [padding, this.hashf(data), ret]//cpack
     }
     decrypt(cpack) {
         let cipher = new aesjs.ModeOfOperation.cbc(this.key, this.iv)
@@ -39,11 +38,11 @@ class Cipher {
         if (data.length - padding < 0)
             return null
         data = data.subarray(0, data.length - padding)
-        if (sha256(data) != digest)
+        if (this.hashf(data) != digest)
             return null
         return data
     }
-    encrypt_stream(streamIn, streamOut) {
+    /*encrypt_stream(streamIn, streamOut) {
         return new Promise((resolve, reject) => {
             let cipher = new aesjs.ModeOfOperation.ecb(this.key)
             let block = new Uint8Array(this.iv);
@@ -105,9 +104,9 @@ class Cipher {
                 return resolve(true)
             })
         })
-    }
+    }*/
 }
 
 if (typeof module === 'object') {
-    module.exports = { random, Cipher, keyGen, ivGen }
+    module.exports = { random, Cipher }
 }
