@@ -11,6 +11,6 @@
   "version": "1.0.0",
   "main": "server.js",
   "author": "paul90317",
-  "license": "ISC",
-  "description": ""
+  "license": "MIT",
+  "description": "secure file server without https"
 }

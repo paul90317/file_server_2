@@ -25,7 +25,7 @@ if (add_config) {
     folder: folder,
     port: port,
     password: password
-  }),{ flag:'w+' })
+  }))
 }
 
 const aesjs = require('aes-js');
@@ -76,7 +76,7 @@ function joinPath(paths) {
   return ret;
 }
 const jszip = require('jszip');
-const { sha256 } = require('js-sha256');
+const { argv } = require('process');
 
 function addFilesFromDirectoryToZip(BasePath, zip, ZipPath = '') {
   fs.readdirSync(BasePath).forEach(filename => {
@@ -174,19 +174,13 @@ http.createServer((req, res) => {
         res.setHeader('status', '3')
         return res.end();
       }
-      let stream = fs.createReadStream(filepath);
-      let out=fs.createWriteStream('stream_'+iv)
-      return cipher.encrypt_stream(stream,out).then(data=>{
-        res.setHeader('padding', data[0].toString())
-        res.setHeader('digest', data[1])
-        res.setHeader('status', '0')
-        return fs.createReadStream('stream_'+iv).on('data',data=>{
-          res.write(data)
-        }).on('end',()=>{
-          res.end()
-          fs.unlinkSync('stream_'+iv);
-        })
-      })
+      let data = fs.readFileSync(filepath);
+      data = new Uint8Array(data)
+      data = cipher.encrypt(data)
+      res.setHeader('padding', data[0].toString())
+      res.setHeader('digest', data[1])
+      res.setHeader('status', '0')
+      return res.end(Buffer.from(data[2]));
     }
     case 'zip': {
       if (!fs.existsSync(filepath) || !fs.lstatSync(filepath).isDirectory()) {
@@ -196,36 +190,42 @@ http.createServer((req, res) => {
       let zip = new jszip();
       addFilesFromDirectoryToZip(filepath + '/', zip);
       let stream = zip.generateNodeStream()
-      let out=fs.createWriteStream('stream_'+iv)
-      return cipher.encrypt_stream(stream,out).then(data=>{
+      let data = []
+      return stream.on('data', chunk => {
+        data.push(chunk)
+      }).on('end', () => {
+        data = new Uint8Array(Buffer.concat(data))
+        data = cipher.encrypt(data)
         res.setHeader('padding', data[0].toString())
         res.setHeader('digest', data[1])
         res.setHeader('status', '0')
-        return fs.createReadStream('stream_'+iv).on('data',data=>{
-          res.write(data)
-        }).on('end',()=>{
-          res.end()
-          fs.unlinkSync('stream_'+iv);
-        })
+        return res.end(Buffer.from(data[2]));
       })
     }
     case 'upload': {
+      let data = [];
       if (fs.existsSync(filepath)) {
         res.setHeader('status', '3')
         return res.end()
       }
-      let out=fs.createWriteStream(filepath)
-      digest = url.params.digest
-      padding = parseInt(url.params.padding)
-      return cipher.decrypt_stream(req,out,digest,padding).then(valid=>{
-        if(valid){
-          res.setHeader('status', '0')
-        }else{
+      return req.on('data', chunk => {
+        data.push(chunk);
+      }).on('end', () => {
+        try {
+          data = Buffer.concat(data)
+          data = new Uint8Array(data)
+          digest = url.params.digest
+          padding = parseInt(url.params.padding)
+          data = cipher.decrypt([padding, digest, data])
+          fs.writeFileSync(filepath, data, { flag: 'w+' });
+        } catch (err) {
+          console.log(err)
           res.setHeader('status', '3')
-          fs.unlinkSync(filepath)
+          return res.end();
         }
+        res.setHeader('status', '0')
         return res.end();
-      })
+      });
     }
     case 'mkdir': {
       if (fs.existsSync(filepath)) {
@@ -319,4 +319,3 @@ http.createServer((req, res) => {
 }).listen(port, () => {
   console.log(`http://127.0.0.1:${port}`)
 });
-
