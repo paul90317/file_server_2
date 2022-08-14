@@ -26,6 +26,8 @@ class Cipher {
         len += padding
         let ret = new Uint8Array(len)
         ret.set(data, 0)
+        for(let i=data.length;i<len;i++)
+            ret[i]=random()
         ret = cipher.encrypt(ret)
         return [padding, this.hashf(data), ret]//cpack
     }
